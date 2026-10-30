@@ -43,6 +43,14 @@
     "esModuleInterop": true,
     "allowSyntheticDefaultImports": true
   },
-  "include": ["index.ts", "src/**/*.ts", "lib/**/*.ts", "lib/redis.js", "lib/redis.js"],
+  "include": [
+    "index.ts",
+    "src/**/*.ts",
+    "lib/**/*.ts",
+    "lib/redis.js",
+    "lib/redis.js",
+    "**/*.d.ts",
+    "**/*.ts"
+  ],
   "exclude": ["node_modules", "dist"]
 }

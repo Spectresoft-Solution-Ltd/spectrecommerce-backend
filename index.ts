@@ -1,23 +1,27 @@
 import { redis } from "./lib/redis.js";
 import { prisma } from "./lib/prisma.js";
 import express, {
-  type Express,
   type Request,
   type Response,
   type NextFunction,
 } from "express";
 import "dotenv/config";
+import cookieParser from "cookie-parser";
 
 const app = express();
+
+app.use(cookieParser());
 
 app.use(express.json());
 
 const port = Number(process.env.PORT ?? 3000);
 
+app.use((_req, res) => res.status(404).json({ message: "not found" }));
+
 app.get("/", async (req: Request, res: Response, next: NextFunction) => {
   try {
     console.log("Action successful at get route");
-    res.send("Hell get")
+    res.send("Hell get");
   } catch (err) {
     console.error(`Failed to fect details from route: ${err}`);
   }
