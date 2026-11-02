@@ -8,6 +8,7 @@ import express, {
 import "dotenv/config";
 import cookieParser from "cookie-parser";
 import { doubleCsrfProtection } from "./lib/doublecsrf.js";
+import api from "./routes/index.js";
 
 const app = express();
 
@@ -16,6 +17,8 @@ app.use(cookieParser());
 app.use(express.json());
 
 app.use(doubleCsrfProtection);
+
+app.use(api);
 
 const port = Number(process.env.PORT ?? 3000);
 

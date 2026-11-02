@@ -16,7 +16,7 @@ const router = Router();
 
 const jwtSecret = process.env.JWT_SECRET || "";
 
-router.post("/", validateRegisterInput, async (req: Request, res: Response) => {
+router.post("/register", validateRegisterInput, async (req: Request, res: Response) => {
   try {
     const { username, firstName, lastName, email, password } = req.body;
     const ph = await PasswordHasher.hash(password);
@@ -39,7 +39,7 @@ router.post("/", validateRegisterInput, async (req: Request, res: Response) => {
   }
 });
 
-router.post("/", validateLoginInput, async (req: Request, res: Response) => {
+router.post("/login", validateLoginInput, async (req: Request, res: Response) => {
   try {
     const { identifier, password } = req.body;
 
@@ -106,7 +106,7 @@ router.post("/", validateLoginInput, async (req: Request, res: Response) => {
 });
 
 router.post(
-  "/",
+  "/logout",
   authenticateAndVerifyCsrf,
   async (req: Request, res: Response) => {
     try {
@@ -130,7 +130,7 @@ router.post(
   },
 );
 
-router.get("/", async (req: Request, res: Response) => {
+router.get("/auth_refresh", async (req: Request, res: Response) => {
   try {
     const token = req.cookies.access_token;
     const csrfToken = req.headers["x-csrf-token"];
@@ -148,7 +148,7 @@ router.get("/", async (req: Request, res: Response) => {
     const validAfter = Number(await redis.get(validAfterKey)) || 0;
     if (!decoded.iat || decoded.iat < validAfter)
       return res.status(401).json({ message: "token already rotated" });
-    
+
     await redis.set(
       validAfterKey,
       Math.floor(Date.now() / 1000),
@@ -194,5 +194,10 @@ router.get("/", async (req: Request, res: Response) => {
         lastName: user.last_name,
       },
     });
-  } catch (err) {}
+  } catch (err) {
+    console.error("Something went wrong on refresh route:", err);
+    return res.status(500).json({ message: "could not issue new token" });
+  }
 });
+
+export default router;
