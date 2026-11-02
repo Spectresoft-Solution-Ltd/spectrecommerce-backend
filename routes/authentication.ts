@@ -8,6 +8,8 @@ import {
 } from "../middleware/auth.js";
 import PasswordHasher from "argon2";
 import { prisma } from "../lib/prisma.js";
+import { generateCsrfToken } from "../lib/doublecsrf.js";
+import { redis } from "../lib/redis.js";
 import crypto from "node:crypto";
 
 const router = Router();
@@ -26,6 +28,7 @@ router.post("/", validateRegisterInput, async (req: Request, res: Response) => {
         email,
         username,
         password_hash: ph,
+        role: req.path.includes("admin") ? "MERCHANT" : "USER",
       },
     });
 
@@ -72,6 +75,8 @@ router.post("/", validateLoginInput, async (req: Request, res: Response) => {
     const signedToken = Jwt.sign(jwtpayload, jwtSecret, {
       expiresIn: "1h",
     });
+
+    generateCsrfToken(req, res);
 
     res.cookie("access_token", signedToken, {
       httpOnly: true,
@@ -124,3 +129,70 @@ router.post(
     }
   },
 );
+
+router.get("/", async (req: Request, res: Response) => {
+  try {
+    const token = req.cookies.access_token;
+    const csrfToken = req.headers["x-csrf-token"];
+
+    if (!token) return res.status(401).json({ message: "un-aunthicated" });
+
+    if (!csrfToken)
+      return res.status(403).json({ message: "csrf missing or mismatch" });
+
+    const decoded = Jwt.verify(token, jwtSecret);
+    if (typeof decoded === "string" || !decoded.exp)
+      return res.status(401).json({ message: "invalid token" });
+
+    const validAfterKey = `auth:valid_after:${decoded.sub}`;
+    const validAfter = Number(await redis.get(validAfterKey)) || 0;
+    if (!decoded.iat || decoded.iat < validAfter)
+      return res.status(401).json({ message: "token already rotated" });
+    
+    await redis.set(
+      validAfterKey,
+      Math.floor(Date.now() / 1000),
+      "EX",
+      15 * 60,
+    );
+
+    const user = await prisma.user.findFirst({
+      where: {
+        id: Number(decoded.sub),
+      },
+    });
+
+    if (!user) return res.status(401).json({ message: "user not found" });
+
+    const jwtpayload = {
+      sub: String(user.id),
+      username: user.username,
+      email: user.email,
+    };
+
+    const signedToken = Jwt.sign(jwtpayload, jwtSecret, {
+      expiresIn: "1h",
+    });
+
+    generateCsrfToken(req, res, { overwrite: true });
+
+    res.cookie("access_token", signedToken, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === "production",
+      sameSite: "lax",
+      maxAge: 60 * 60 * 1000,
+      path: "/",
+    });
+
+    return res.status(200).json({
+      message: "Refresh successful",
+      user: {
+        id: user.id,
+        username: user.username,
+        email: user.email,
+        firstName: user.first_name,
+        lastName: user.last_name,
+      },
+    });
+  } catch (err) {}
+});

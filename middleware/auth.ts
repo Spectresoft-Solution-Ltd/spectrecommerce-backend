@@ -1,11 +1,13 @@
 import "dotenv/config";
-import Jwt from "jsonwebtoken";
+import Jwt, { JwtPayload } from "jsonwebtoken";
 import { type Request, type Response, type NextFunction } from "express";
 import * as z from "zod";
+import { redis } from "../lib/redis.js";
+import { doubleCsrfProtection } from "../lib/doublecsrf.js";
 
 const jwtSecret = process.env.JWT_SECRET;
 
-export function authenticateAndVerifyCsrf(
+export async function authenticateAndVerifyCsrf(
   req: Request,
   res: Response,
   next: NextFunction,
@@ -22,14 +24,25 @@ export function authenticateAndVerifyCsrf(
 
   try {
     const decoded = Jwt.verify(token, jwtSecret);
-    req.user = decoded;
+
+    if (typeof decoded === "string") {
+      return res.status(401).json({ message: "invalid token" });
+    }
+
+    req.user = decoded as JwtPayload;
     const csrfHeader = req.headers["x-csrf-token"];
 
-    if (!csrfHeader || csrfHeader !== token) {
+    const validAfter =
+      Number(await redis.get(`auth:valid_after:${decoded.sub}`)) || 0;
+    if (!decoded.iat || decoded.iat < validAfter) {
+      return res.status(401).json({ message: "token revoked" });
+    }
+
+    if (!csrfHeader) {
       return res.status(403).json({ message: "csrf missing or mismatch" });
     }
 
-    next();
+    return doubleCsrfProtection(req, res, next);
   } catch (err) {
     console.log("issues with authentication middleware:", err);
     return res.status(401).json({ message: "invalid or expired token" });
