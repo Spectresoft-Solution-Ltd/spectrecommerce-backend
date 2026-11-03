@@ -30,16 +30,11 @@ export async function authenticateAndVerifyCsrf(
     }
 
     req.user = decoded as JwtPayload;
-    const csrfHeader = req.headers["x-csrf-token"];
 
     const validAfter =
       Number(await redis.get(`auth:valid_after:${decoded.sub}`)) || 0;
     if (!decoded.iat || decoded.iat < validAfter) {
       return res.status(401).json({ message: "token revoked" });
-    }
-
-    if (!csrfHeader) {
-      return res.status(403).json({ message: "csrf missing or mismatch" });
     }
 
     return doubleCsrfProtection(req, res, next);
@@ -73,9 +68,10 @@ export function validateRegisterInput(
     const result = registerSchema.safeParse(req.body);
 
     if (!result.success) {
-      return res
-        .status(400)
-        .json({ message: "invalid or missing request body" });
+      return res.status(400).json({
+        message: "invalid or missing request body",
+        errors: z.treeifyError(result.error),
+      });
     }
     next();
   } catch (err) {
@@ -102,7 +98,10 @@ export function validateLoginInput(
     if (!result.success) {
       return res
         .status(400)
-        .json({ message: "invalid or missing request body" });
+        .json({
+          message: "invalid or missing request body",
+          errors: z.treeifyError(result.error),
+        });
     }
 
     next();

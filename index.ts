@@ -7,7 +7,7 @@ import express, {
 } from "express";
 import "dotenv/config";
 import cookieParser from "cookie-parser";
-import { doubleCsrfProtection } from "./lib/doublecsrf.js";
+import { doubleCsrfProtection, invalidCsrfTokenError } from "./lib/doublecsrf.js";
 import api from "./routes/index.js";
 
 const app = express();
@@ -16,11 +16,18 @@ app.use(cookieParser());
 
 app.use(express.json());
 
-app.use(doubleCsrfProtection);
+// app.use(doubleCsrfProtection);
 
 app.use(api);
 
 const port = Number(process.env.PORT ?? 3000);
+
+app.use((err: unknown, _req: Request, res: Response, next: NextFunction) => {
+  if (err === invalidCsrfTokenError) {
+    return res.status(403).json({ message: "invalid csrf token" });
+  }
+  next(err);
+});
 
 app.use((_req, res) => res.status(404).json({ message: "not found" }));
 
