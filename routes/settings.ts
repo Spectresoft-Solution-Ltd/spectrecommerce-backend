@@ -9,7 +9,7 @@ import { upload } from "../lib/multer.js";
 
 const router = Router();
 
-router.post(
+router.patch(
   "/profile",
   authenticateAndVerifyCsrf,
   upload.single("cover_image"),
@@ -66,6 +66,52 @@ router.post(
       return res
         .status(500)
         .json({ success: false, message: "Error updating profile settings" });
+    }
+  },
+);
+
+router.get(
+  "/profile",
+  authenticateAndVerifyCsrf,
+  async (req: Request, res: Response) => {
+    try {
+      const user = req.user;
+      if (!user)
+        return res
+          .status(401)
+          .json({ success: false, message: "Authentication required" });
+
+      const foundUser = await prisma.user.findFirst({
+        where: { username: user.username },
+      });
+
+      if (!foundUser)
+        return res
+          .status(404)
+          .json({ success: false, message: "user not found" });
+
+      const profile = await prisma.profile.findFirst({
+        where: { user_id: foundUser.id },
+      });
+
+      const profileData = {
+        cover_image: profile?.cover_image,
+        bg_mode: profile?.bg_mode,
+        shipping_addresses: profile?.shipping_addresses,
+      };
+
+      return res
+        .status(200)
+        .json({
+          success: true,
+          message: "fetch successful",
+          data: profileData,
+        });
+    } catch (err) {
+      console.error("Something went wrong getting profile:", err);
+      res
+        .status(500)
+        .json({ success: false, message: "Error fetching profile" });
     }
   },
 );
