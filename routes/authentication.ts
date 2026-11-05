@@ -23,6 +23,17 @@ router.post(
       const { username, firstName, lastName, email, password } = req.body;
       const ph = await PasswordHasher.hash(password);
 
+      const foundUser = await prisma.user.findFirst({
+        where: {
+          OR: [{ email }, { username }],
+        },
+      });
+
+      if (foundUser)
+        return res
+          .status(409)
+          .json({ success: false, message: "Account already exists" });
+
       await prisma.user.create({
         data: {
           first_name: firstName,
@@ -125,6 +136,8 @@ router.post(
         sameSite: "lax",
         path: "/",
       });
+
+      res.clearCookie("x-csrf-token");
 
       return res.status(200).json({
         message: "Logout successful",
