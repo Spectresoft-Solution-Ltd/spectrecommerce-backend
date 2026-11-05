@@ -73,6 +73,8 @@ export function validateRegisterInput(
         errors: z.treeifyError(result.error),
       });
     }
+
+    req.body = result.data;
     next();
   } catch (err) {
     console.log("issue with validation:", err);
@@ -96,14 +98,13 @@ export function validateLoginInput(
     const result = loginSchema.safeParse(req.body);
 
     if (!result.success) {
-      return res
-        .status(400)
-        .json({
-          message: "invalid or missing request body",
-          errors: z.treeifyError(result.error),
-        });
+      return res.status(400).json({
+        message: "invalid or missing request body",
+        errors: z.treeifyError(result.error),
+      });
     }
 
+    req.body = result.data;
     next();
   } catch (err) {
     console.log("issue with validation:", err);

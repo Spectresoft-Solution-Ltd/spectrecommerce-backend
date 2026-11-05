@@ -38,7 +38,7 @@ model Profile {
   user_id            Int
   user               User     @relation(fields: [user_id], references: [id])
   cover_image        String?
-  bg_mode            BgMode
+  bg_mode            BgMode?
   shipping_addresses String[]
 
   @@unique([user_id])
