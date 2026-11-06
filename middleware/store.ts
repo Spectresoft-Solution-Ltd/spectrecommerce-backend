@@ -94,4 +94,26 @@ const validateStoreInput = async (
   }
 };
 
-export { validateStoreInput };
+const validateparam = (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const result = z.number().safeParse(req.body.id);
+
+    if (!result.success) {
+      return res.status(400).json({
+        message: "invalid or missing request body",
+        errors: z.treeifyError(result.error),
+      });
+    }
+
+    req.body = result.data;
+    next();
+  } catch (err) {
+    console.error("Error validating store input:", err);
+    return res.status(500).json({
+      success: false,
+      message: "Failed to validate store param",
+    });
+  }
+};
+
+export { validateStoreInput, validateparam };
