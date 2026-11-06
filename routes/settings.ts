@@ -6,6 +6,7 @@ import {
   validateSettingsInput,
 } from "../middleware/settings.js";
 import { upload } from "../lib/multer.js";
+import { redis } from "../lib/redis.js";
 
 const router = Router();
 
@@ -18,12 +19,13 @@ router.patch(
   async (req: Request, res: Response) => {
     try {
       const user = req.user;
-      console.log(user, "is req user");
 
       if (!user?.exp)
         return res
           .status(401)
           .json({ success: false, message: "Authentication required" });
+
+      const cacheKey = `redis_profile:${user.username}`;
 
       const foundUser = await prisma.user.findFirst({
         where: {
@@ -58,6 +60,12 @@ router.patch(
         },
       });
 
+      try {
+        await redis.del(cacheKey);
+      } catch (redisError) {
+        console.error("Redis cache invalidation failed:", redisError);
+      }
+
       return res
         .status(200)
         .json({ success: true, message: "Profile update successful" });
@@ -81,32 +89,42 @@ router.get(
           .status(401)
           .json({ success: false, message: "Authentication required" });
 
-      const foundUser = await prisma.user.findFirst({
+      const cacheKey = `redis_profile:${user.username}`;
+
+      const cachedProfile = await redis.get(cacheKey);
+
+      if (cachedProfile)
+        return res.status(200).json({
+          message: "fetch successful",
+          success: true,
+          data: JSON.parse(cachedProfile),
+        });
+
+      const foundProfile = await prisma.user.findUnique({
         where: { username: user.username },
+        include: { profiles: true },
       });
 
-      if (!foundUser)
+      const profile = foundProfile?.profiles[0];
+
+      if (!profile)
         return res
           .status(404)
-          .json({ success: false, message: "user not found" });
-
-      const profile = await prisma.profile.findFirst({
-        where: { user_id: foundUser.id },
-      });
+          .json({ success: false, message: "user profile not found" });
 
       const profileData = {
-        cover_image: profile?.cover_image,
-        bg_mode: profile?.bg_mode,
-        shipping_addresses: profile?.shipping_addresses,
+        cover_image: profile.cover_image,
+        bg_mode: profile.bg_mode,
+        shipping_addresses: profile.shipping_addresses,
       };
 
-      return res
-        .status(200)
-        .json({
-          success: true,
-          message: "fetch successful",
-          data: profileData,
-        });
+      await redis.set(cacheKey, JSON.stringify(profileData), "EX", 4 * 60 * 60);
+
+      return res.status(200).json({
+        success: true,
+        message: "fetch successful",
+        data: profileData,
+      });
     } catch (err) {
       console.error("Something went wrong getting profile:", err);
       res
