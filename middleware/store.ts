@@ -295,6 +295,7 @@ const validateBankAccountInput = async (
       bank_accounts: z
         .array(
           z.object({
+            bank_id: z.number().optional(),
             bank_name: z.string().trim().min(1, "Bank name is required"),
             account_name: z.string().trim().min(1, "Account name is required"),
             account_number: z

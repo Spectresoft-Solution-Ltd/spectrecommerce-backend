@@ -476,12 +476,12 @@ router.patch(
       // Update existing accounts or create new ones
       await prisma.$transaction(
         bank_accounts.map((item: BankAccouts) => {
-          const { id: bankId, ...data } = item;
+          const { bank_id, ...data } = item;
 
-          if (bankId) {
+          if (bank_id) {
             return prisma.storeBankAccount.updateMany({
               where: {
-                id: bankId,
+                id: Number(bank_id),
                 store_id: storeId,
               },
               data,

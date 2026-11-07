@@ -4,7 +4,7 @@ export interface Members {
 }
 
 export interface BankAccouts {
-  id?: number;
+  bank_id?: number;
   bank_name: string;
   account_name: string;
   account_number: string;
