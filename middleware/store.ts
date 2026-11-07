@@ -1,8 +1,10 @@
 import * as z from "zod";
 import { type Request, type Response, type NextFunction } from "express";
 import { UploadApiResponse } from "cloudinary";
-import { cloudinary } from "../lib/cloudinanry.js";
+import sharp from "sharp";
 import { randomUUID } from "node:crypto";
+import { uploadToCloudinary } from "../utils/functions/index.js";
+import { cloudinary } from "../lib/cloudinanry.js";
 
 const validateStoreInput = async (
   req: Request,
@@ -105,6 +107,31 @@ const validateparam = async (
   next: NextFunction,
 ) => {
   try {
+    const result = z.string().safeParse(req.params.id);
+
+    if (!result.success) {
+      return res.status(400).json({
+        message: "query parameter missing",
+        errors: z.treeifyError(result.error),
+      });
+    }
+
+    next();
+  } catch (err) {
+    console.error("Error validating store input:", err);
+    return res.status(500).json({
+      success: false,
+      message: "Failed to validate store param",
+    });
+  }
+};
+
+const validateQuery = async (
+  req: Request,
+  res: Response,
+  next: NextFunction,
+) => {
+  try {
     const result = z.string().safeParse(req.query.id);
 
     if (!result.success) {
@@ -185,46 +212,43 @@ const uploadStoreImagesToCloudinary = async (
       });
     }
 
-    // Supports both upload.array() and upload.fields()
+    const storeId = Number(req.query.id);
+
     const files = Array.isArray(req.files)
       ? req.files
       : Object.values(req.files ?? {}).flat();
 
-    if (!files.length) {
-      return next();
-    }
+    if (!files.length) return next();
 
     const uploadedFiles: Record<string, UploadApiResponse[]> = {};
 
+    const folder = `SPECTRECOMMERCE/${user.username}/store/${storeId}`;
+
+    const counters: Record<string, number> = {};
+
     for (const file of files) {
-      const publicId = `${file.fieldname}-${randomUUID()}`;
+      counters[file.fieldname] = (counters[file.fieldname] ?? 0) + 1;
 
-      const uploadResult = await new Promise<UploadApiResponse>(
-        (resolve, reject) => {
-          const uploadStream = cloudinary.uploader.upload_stream(
-            {
-              folder: `SPECTRECOMMERCE/${user.username}/store`,
-              public_id: publicId,
-              resource_type: "image",
-              overwrite: false,
-              invalidate: true,
-              allowed_formats: ["jpg", "jpeg", "png", "webp"],
-            },
-            (error, result) => {
-              if (error) return reject(error);
+      const imageIndex = counters[file.fieldname];
 
-              if (!result) {
-                return reject(
-                  new Error("Cloudinary returned no upload result"),
-                );
-              }
+      const optimizedBuffer = await sharp(file.buffer)
+        .rotate()
+        .resize({
+          width: file.fieldname === "logo" ? 600 : 1920,
+          height: file.fieldname === "logo" ? 600 : 1920,
+          fit: "inside",
+          withoutEnlargement: true,
+        })
+        .webp({ quality: 82, effort: 4 })
+        .toBuffer();
 
-              resolve(result);
-            },
-          );
+      const publicId =
+        file.fieldname === "logo" ? "logo" : `cover_bg-${imageIndex}`;
 
-          uploadStream.end(file.buffer);
-        },
+      const uploadResult = await uploadToCloudinary(
+        optimizedBuffer,
+        folder,
+        publicId,
       );
 
       if (!uploadedFiles[file.fieldname]) {
@@ -232,6 +256,15 @@ const uploadStoreImagesToCloudinary = async (
       }
 
       uploadedFiles[file.fieldname].push(uploadResult);
+    }
+
+    // Remove unused previous cover image slots when replacing the collection.
+    if (counters.cover_bg) {
+      for (let i = counters.cover_bg + 1; i <= 5; i++) {
+        await cloudinary.uploader.destroy(`${folder}/cover_bg-${i}`, {
+          resource_type: "image",
+        });
+      }
     }
 
     req.cloudinaryUploads = uploadedFiles;
@@ -246,9 +279,11 @@ const uploadStoreImagesToCloudinary = async (
     });
   }
 };
+
 export {
   validateStoreInput,
   validateparam,
   validateStoreAppearanceInputs,
   uploadStoreImagesToCloudinary,
+  validateQuery,
 };

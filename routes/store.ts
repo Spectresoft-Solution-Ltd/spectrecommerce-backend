@@ -10,6 +10,7 @@ import { prisma } from "../lib/prisma.js";
 import {
   uploadStoreImagesToCloudinary,
   validateparam,
+  validateQuery,
   validateStoreAppearanceInputs,
   validateStoreInput,
 } from "../middleware/store.js";
@@ -197,7 +198,7 @@ router.get(
 );
 
 router.get(
-  "/store",
+  "/store/:id",
   authenticateAndVerifyCsrf,
   validateparam,
   async (req: Request, res: Response) => {
@@ -209,18 +210,18 @@ router.get(
           .status(401)
           .json({ success: false, message: "Authentication required" });
 
-      const { id } = req.query;
+      const { id } = req.params;
 
       const storeId = Number(id);
 
-      const cacheKey = `redis_store:${user.username}:${id}`;
+      const cacheKey = `redis_store:${user.username}:${storeId}`;
 
       const cachedStore = await redis.get(cacheKey);
 
       if (cachedStore)
         return res
           .status(200)
-          .json({ message: "Fetch successful", data: cachedStore });
+          .json({ message: "Fetch successful", data: JSON.parse(cachedStore) });
 
       const foundStore = await prisma.store.findFirst({
         where: {
@@ -276,50 +277,96 @@ router.patch(
     try {
       const user = req.user;
 
-      if (!user)
-        return res
-          .status(401)
-          .json({ success: false, message: "Authentication required!" });
+      if (!user) {
+        return res.status(401).json({
+          success: false,
+          message: "Authentication required!",
+        });
+      }
 
-      const { id } = req.query;
-      const { cover_bg, logo, bg_mode, background_color } = req.body;
-      const storeId = Number(id);
+      const storeId = Number(req.query.id);
 
-      const coverImages = req.cloudinaryUploads?.cover_bg ?? [];
-      const logo_url = req.cloudinaryUploads?.logo?.[0].secure_url;
-      const cover_images = coverImages.map((image) => image.secure_url);
+      if (!Number.isInteger(storeId) || storeId <= 0) {
+        return res.status(400).json({
+          success: false,
+          message: "Invalid store ID",
+        });
+      }
 
-      const cacheKey = `redis_store_appearance:${storeId}`;
+      const cacheKey = `redis_store:${user.username}:${storeId}`;
 
-      const storeAppearance = {
-        ...(cover_bg && cover_images && cover_images),
-        ...(logo && logo_url && logo_url),
-        ...(bg_mode && bg_mode),
-        ...(background_color && background_color),
-      };
-      await prisma.storeAppearance.upsert({
-        where: { store_id: storeId },
-        update: storeAppearance,
-        create: {
-          store_id: storeId,
-          ...storeAppearance,
+      // Verify store ownership/membership
+      const store = await prisma.store.findFirst({
+        where: {
+          id: storeId,
+          storeMemberships: {
+            some: {
+              user: {
+                username: user.username,
+              },
+            },
+          },
         },
       });
 
-      try {
-        await redis.del(cacheKey);
-      } catch (redisError) {
-        console.error("Redis cache invalidation failed:", redisError);
+      if (!store) {
+        return res.status(404).json({
+          success: false,
+          message: "Store not found",
+        });
       }
 
-      return res
-        .status(200)
-        .json({ message: "Store update successful", success: "true" });
+      const { bg_mode, background_color } = req.body;
+
+      const coverImages = req.cloudinaryUploads?.cover_bg ?? [];
+
+      const logoUrl = req.cloudinaryUploads?.logo?.[0]?.secure_url;
+
+      const coverImageUrls = coverImages.map((image) => image.secure_url);
+
+      // Only update fields explicitly provided
+      const appearanceData = {
+        ...(coverImages.length > 0 && {
+          cover_images: coverImageUrls,
+        }),
+        ...(logoUrl && {
+          logo_url: logoUrl,
+        }),
+        ...(bg_mode !== undefined && {
+          bg_mode,
+        }),
+        ...(background_color !== undefined && {
+          background_color,
+        }),
+      };
+
+      await prisma.storeAppearance.upsert({
+        where: {
+          store_id: storeId,
+        },
+        update: appearanceData,
+        create: {
+          store_id: storeId,
+          cover_images: coverImageUrls,
+          logo_url: logoUrl ?? null,
+          bg_mode: bg_mode ?? "light",
+          background_color: background_color ?? null,
+        },
+      });
+
+      // Invalidate store cache
+      await redis.del(cacheKey);
+
+      return res.status(200).json({
+        success: true,
+        message: "Store appearance updated successfully",
+      });
     } catch (err) {
-      console.error("Error setting store appearance");
+      console.error("Error setting store appearance:", err);
+
       return res.status(500).json({
         success: false,
-        message: "Proble updating store appearance settings",
+        message: "Problem updating store appearance settings",
       });
     }
   },
@@ -328,7 +375,7 @@ router.patch(
 router.get(
   "/store/settings/appearance",
   authenticateAndVerifyCsrf,
-  validateparam,
+  validateQuery,
   async (req: Request, res: Response) => {
     try {
       const user = req.user;
