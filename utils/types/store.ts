@@ -6,7 +6,7 @@ export interface Members {
 export interface PaymentProviders {
   provider: string;
   public_key: string;
-  sectret_key: string;
+  secret_key: string;
   is_enabled?: boolean;
 }
 

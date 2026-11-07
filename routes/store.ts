@@ -7,10 +7,17 @@ import {
 import { redis } from "../lib/redis.js";
 import { authenticateAndVerifyCsrf } from "../middleware/auth.js";
 import { prisma } from "../lib/prisma.js";
-import { validateparam, validateStoreInput } from "../middleware/store.js";
+import {
+  uploadStoreImagesToCloudinary,
+  validateparam,
+  validateStoreAppearanceInputs,
+  validateStoreInput,
+} from "../middleware/store.js";
 import { Members, PaymentProviders } from "../utils/types/store.js";
 import { createCipheriv, createDecipheriv, randomBytes } from "node:crypto";
 import { encryptData } from "../utils/algorithm/index.js";
+import { upload } from "../lib/multer.js";
+import multer from "multer";
 
 const router = Router();
 
@@ -31,9 +38,9 @@ router.post(
         slug,
         name,
         description,
-        members,
-        bank_accounts,
-        payment_providers,
+        members = [],
+        bank_accounts = [],
+        payment_providers = [],
       } = req.body;
 
       const foundSlug = await prisma.store.findUnique({ where: { slug } });
@@ -43,7 +50,9 @@ router.post(
           .status(403)
           .json({ success: false, message: "Store was previously created" });
 
-      const creator = await prisma.user.findUnique({ where: user.username });
+      const creator = await prisma.user.findUnique({
+        where: { username: user.username },
+      });
 
       if (!creator)
         return res
@@ -52,13 +61,15 @@ router.post(
 
       const cacheKey = `redis_store:${user.username}`;
 
-      const workers = await prisma.user.findMany({
-        where: {
-          username: {
-            in: members.map((member: Members) => member.username),
-          },
-        },
-      });
+      const workers = members.length
+        ? await prisma.user.findMany({
+            where: {
+              username: {
+                in: members.map((member: Members) => member.username),
+              },
+            },
+          })
+        : [];
 
       if (workers.length !== members.length) {
         return res.status(400).json({
@@ -66,7 +77,6 @@ router.post(
           message: "One or more members do not exist",
         });
       }
-
       const constructedMembers = [
         {
           username: creator.username,
@@ -78,13 +88,12 @@ router.post(
         })),
       ];
 
-      const encryptedProvider = payment_providers
-        ? {
-            ...payment_providers,
-            secret_key: encryptData(payment_providers.secret_key),
-            webhook_secret: encryptData(payment_providers.webhook_secret),
-          }
-        : [];
+      const encryptedProvider = payment_providers.map(
+        (provider: PaymentProviders) => ({
+          ...provider,
+          secret_key: encryptData(provider.secret_key),
+        }),
+      );
 
       await prisma.store.create({
         data: {
@@ -92,7 +101,14 @@ router.post(
           description,
           slug,
           storeMemberships: {
-            create: constructedMembers,
+            create: constructedMembers.map((member) => ({
+              role: member.role,
+              user: {
+                connect: {
+                  username: member.username,
+                },
+              },
+            })),
           },
           bankAccounts: {
             create: bank_accounts,
@@ -139,7 +155,7 @@ router.get(
       if (cachedStore)
         return res
           .status(200)
-          .json({ message: "Fetch successful", data: cachedStore });
+          .json({ message: "Fetch successful", data: JSON.parse(cachedStore) });
 
       const foundStores = await prisma.store.findMany({
         where: {
@@ -193,7 +209,7 @@ router.get(
           .status(401)
           .json({ success: false, message: "Authentication required" });
 
-      const { id } = req.params;
+      const { id } = req.query;
 
       const storeId = Number(id);
 
@@ -243,6 +259,120 @@ router.get(
       return res
         .status(500)
         .json({ success: false, message: "Problem fetching store details" });
+    }
+  },
+);
+
+router.patch(
+  "/store/settings/appearance",
+  authenticateAndVerifyCsrf,
+  upload.fields([
+    { name: "cover_bg", maxCount: 5 },
+    { name: "logo", maxCount: 1 },
+  ]),
+  validateStoreAppearanceInputs,
+  uploadStoreImagesToCloudinary,
+  async (req: Request, res: Response) => {
+    try {
+      const user = req.user;
+
+      if (!user)
+        return res
+          .status(401)
+          .json({ success: false, message: "Authentication required!" });
+
+      const { id } = req.query;
+      const { cover_bg, logo, bg_mode, background_color } = req.body;
+      const storeId = Number(id);
+
+      const coverImages = req.cloudinaryUploads?.cover_bg ?? [];
+      const logo_url = req.cloudinaryUploads?.logo?.[0].secure_url;
+      const cover_images = coverImages.map((image) => image.secure_url);
+
+      const cacheKey = `redis_store_appearance:${storeId}`;
+
+      const storeAppearance = {
+        ...(cover_bg && cover_images && cover_images),
+        ...(logo && logo_url && logo_url),
+        ...(bg_mode && bg_mode),
+        ...(background_color && background_color),
+      };
+      await prisma.storeAppearance.upsert({
+        where: { store_id: storeId },
+        update: storeAppearance,
+        create: {
+          store_id: storeId,
+          ...storeAppearance,
+        },
+      });
+
+      try {
+        await redis.del(cacheKey);
+      } catch (redisError) {
+        console.error("Redis cache invalidation failed:", redisError);
+      }
+
+      return res
+        .status(200)
+        .json({ message: "Store update successful", success: "true" });
+    } catch (err) {
+      console.error("Error setting store appearance");
+      return res.status(500).json({
+        success: false,
+        message: "Proble updating store appearance settings",
+      });
+    }
+  },
+);
+
+router.get(
+  "/store/settings/appearance",
+  authenticateAndVerifyCsrf,
+  validateparam,
+  async (req: Request, res: Response) => {
+    try {
+      const user = req.user;
+      if (!user)
+        return res
+          .status(401)
+          .json({ success: false, message: "Authentication required!" });
+
+      const { id } = req.query;
+      const storeId = Number(id);
+
+      const cacheKey = `redis_store_appearance:${storeId}`;
+
+      const cachedAppearance = await redis.get(cacheKey);
+
+      if (cachedAppearance)
+        return res.status(200).json({
+          message: "Fetch successful",
+          success: true,
+          data: cachedAppearance,
+        });
+
+      const foundApearance = await prisma.storeAppearance.findFirst({
+        where: { store_id: storeId },
+      });
+
+      await redis.set(
+        cacheKey,
+        JSON.stringify(foundApearance),
+        "EX",
+        4 * 60 * 60,
+      );
+
+      return res.status(200).json({
+        message: "Fetch successful",
+        success: true,
+        data: foundApearance,
+      });
+    } catch (err) {
+      console.error("Error setting store appearance");
+      return res.status(500).json({
+        success: false,
+        message: "Proble fetching store appearance settings",
+      });
     }
   },
 );

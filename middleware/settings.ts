@@ -3,7 +3,6 @@ import { type Request, type Response, type NextFunction } from "express";
 import { cloudinary } from "../lib/cloudinanry.js";
 import type { UploadApiResponse } from "cloudinary";
 import multer from "multer";
-import { prisma } from "../lib/prisma.js";
 
 const validateSettingsInput = (
   req: Request,
@@ -58,7 +57,7 @@ const uploadProfileCoverToCloudinary = async (
 
     const user = req.user;
 
-    if (!user?.exp)
+    if (!user)
       return res
         .status(401)
         .json({ success: false, message: "Authentication required" });

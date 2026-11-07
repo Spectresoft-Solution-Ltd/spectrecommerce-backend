@@ -250,7 +250,7 @@ model StoreAppearance {
   id               Int      @id @default(autoincrement())
   store_id         Int      @unique
   store            Store    @relation(fields: [store_id], references: [id])
-  cover_image      String?
+  cover_images     String[]
   logo_url         String?
   bg_mode          BgMode   @default(light)
   background_color String?

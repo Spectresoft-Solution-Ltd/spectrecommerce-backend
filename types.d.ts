@@ -11,6 +11,7 @@ declare global {
   namespace Express {
     interface Request {
       cloudinaryUpload?: UploadApiResponse;
+      cloudinaryUploads?: Record<string, UploadApiResponse[]>;
     }
   }
 }
