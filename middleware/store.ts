@@ -5,6 +5,11 @@ import sharp from "sharp";
 import { randomUUID } from "node:crypto";
 import { uploadToCloudinary } from "../utils/functions/index.js";
 import { cloudinary } from "../lib/cloudinanry.js";
+import { prisma } from "../lib/prisma.js";
+import {
+  ROLE_PERMISSIONS,
+  StorePermission,
+} from "../utils/types/permission.js";
 
 const validateStoreInput = async (
   req: Request,
@@ -280,10 +285,153 @@ const uploadStoreImagesToCloudinary = async (
   }
 };
 
+const validateBankAccountInput = async (
+  req: Request,
+  res: Response,
+  next: NextFunction,
+) => {
+  try {
+    const inputSchema = z.object({
+      bank_accounts: z
+        .array(
+          z.object({
+            bank_name: z.string().trim().min(1, "Bank name is required"),
+            account_name: z.string().trim().min(1, "Account name is required"),
+            account_number: z
+              .string()
+              .trim()
+              .min(1, "Account number is required"),
+            is_enabled: z.boolean().default(true),
+          }),
+        )
+        .min(1, "At least one bank account is required"),
+    });
+
+    const paramSchema = z.object({
+      id: z.string(),
+    });
+
+    const result = inputSchema.safeParse(req.body);
+
+    if (!result.success) {
+      return res.status(400).json({
+        message: "Invalid or missing request body",
+        errors: z.treeifyError(result.error),
+      });
+    }
+
+    const param = paramSchema.safeParse(req.query);
+
+    if (!param.success)
+      return res.status(400).json({
+        message: "query parameter missing",
+        errors: z.treeifyError(param.error),
+      });
+
+    req.body = result.data;
+    next();
+  } catch (err) {
+    console.error("Error validating bank account input:", err);
+    return res.status(500).json({
+      success: false,
+      message: "Failed to validate bank accounts inputs",
+    });
+  }
+};
+
+const validateBankFetchQuery = async (
+  req: Request,
+  res: Response,
+  next: NextFunction,
+) => {
+  try {
+    const query = z.string();
+    const result = query.safeParse(req.query.id);
+
+    if (!result.success) {
+      return res.status(400).json({
+        message: "query parameter missing",
+        errors: z.treeifyError(result.error),
+      });
+    }
+
+    next();
+  } catch (err) {
+    console.error("Problem validating bank fetch query:", err);
+    return res.status(500).json({
+      success: false,
+      message: "failed to validate bank account query",
+    });
+  }
+};
+
+const requireStorePermission = (permission: StorePermission) => {
+  return async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const user = req.user;
+
+      if (!user) {
+        return res.status(401).json({
+          success: false,
+          message: "Authentication required",
+        });
+      }
+
+      const user_id = Number(user.sub);
+      const store_id = Number(req.query.id);
+
+      if (!Number.isInteger(store_id) || store_id <= 0) {
+        return res.status(400).json({
+          success: false,
+          message: "Invalid store ID",
+        });
+      }
+
+      const membership = await prisma.storeMembership.findFirst({
+        where: {
+          user_id,
+          store_id,
+        },
+      });
+
+      if (!membership) {
+        return res.status(403).json({
+          success: false,
+          message: "You are not a member of this store",
+        });
+      }
+
+      const permissions = ROLE_PERMISSIONS[membership.role];
+
+      if (!permissions.includes(permission)) {
+        return res.status(403).json({
+          success: false,
+          message: "You don't have permission to perform this action",
+        });
+      }
+
+      // Make membership available to subsequent handlers
+      res.locals.storeMembership = membership;
+
+      next();
+    } catch (err) {
+      console.error("Permission verification failed:", err);
+
+      return res.status(500).json({
+        success: false,
+        message: "Failed to verify user permissions",
+      });
+    }
+  };
+};
+
 export {
   validateStoreInput,
   validateparam,
   validateStoreAppearanceInputs,
   uploadStoreImagesToCloudinary,
   validateQuery,
+  requireStorePermission,
+  validateBankAccountInput,
+  validateBankFetchQuery,
 };

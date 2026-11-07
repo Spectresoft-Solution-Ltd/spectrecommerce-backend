@@ -3,6 +3,14 @@ export interface Members {
   role: Role;
 }
 
+export interface BankAccouts {
+  id?: number;
+  bank_name: string;
+  account_name: string;
+  account_number: string;
+  is_enabled: boolean;
+}
+
 export interface PaymentProviders {
   provider: string;
   public_key: string;

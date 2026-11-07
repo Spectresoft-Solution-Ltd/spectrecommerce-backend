@@ -8,13 +8,20 @@ import { redis } from "../lib/redis.js";
 import { authenticateAndVerifyCsrf } from "../middleware/auth.js";
 import { prisma } from "../lib/prisma.js";
 import {
+  requireStorePermission,
   uploadStoreImagesToCloudinary,
+  validateBankAccountInput,
+  validateBankFetchQuery,
   validateparam,
   validateQuery,
   validateStoreAppearanceInputs,
   validateStoreInput,
 } from "../middleware/store.js";
-import { Members, PaymentProviders } from "../utils/types/store.js";
+import {
+  BankAccouts,
+  Members,
+  PaymentProviders,
+} from "../utils/types/store.js";
 import { createCipheriv, createDecipheriv, randomBytes } from "node:crypto";
 import { encryptData } from "../utils/algorithm/index.js";
 import { upload } from "../lib/multer.js";
@@ -418,8 +425,157 @@ router.get(
       console.error("Error setting store appearance");
       return res.status(500).json({
         success: false,
-        message: "Proble fetching store appearance settings",
+        message: "Problem fetching store appearance settings",
       });
+    }
+  },
+);
+
+router.patch(
+  "/store/settings/bankaccounts",
+  authenticateAndVerifyCsrf,
+  requireStorePermission("UPDATE_STORE_BANK_ACCOUNTS"),
+  validateBankAccountInput,
+  async (req: Request, res: Response) => {
+    try {
+      const user = req.user;
+
+      if (!user) {
+        return res.status(401).json({
+          success: false,
+          message: "Authentication required!",
+        });
+      }
+
+      const storeId = Number(req.query.id);
+      const { bank_accounts = [] } = req.body;
+      const cacheKey = `redis_store_bankAC:${user.sub}:${storeId}`;
+
+      if (!Number.isInteger(storeId) || storeId <= 0) {
+        return res.status(400).json({
+          success: false,
+          message: "Invalid store ID",
+        });
+      }
+
+      // Verify store membership
+      const membership = await prisma.storeMembership.findFirst({
+        where: {
+          store_id: storeId,
+          user_id: Number(user.sub),
+        },
+      });
+
+      if (!membership) {
+        return res.status(403).json({
+          success: false,
+          message: "You don't have access to this store",
+        });
+      }
+
+      // Update existing accounts or create new ones
+      await prisma.$transaction(
+        bank_accounts.map((item: BankAccouts) => {
+          const { id: bankId, ...data } = item;
+
+          if (bankId) {
+            return prisma.storeBankAccount.updateMany({
+              where: {
+                id: bankId,
+                store_id: storeId,
+              },
+              data,
+            });
+          }
+
+          return prisma.storeBankAccount.create({
+            data: {
+              ...data,
+              store_id: storeId,
+            },
+          });
+        }),
+      );
+
+      await redis.del(cacheKey);
+
+      return res.status(200).json({
+        success: true,
+        message: "Store bank details updated successfully",
+      });
+    } catch (err) {
+      console.error("Error updating store bank accounts:", err);
+
+      return res.status(500).json({
+        success: false,
+        message: "Problem updating store bank accounts",
+      });
+    }
+  },
+);
+
+router.get(
+  "/store/settings/bankaccounts",
+  authenticateAndVerifyCsrf,
+  validateBankFetchQuery,
+  async (req: Request, res: Response) => {
+    try {
+      const user = req.user;
+
+      if (!user)
+        return res
+          .status(401)
+          .json({ success: false, message: "Authentication required!" });
+
+      const { id } = req.query;
+      const storeId = Number(id);
+
+      const cacheKey = `redis_store_bankAC:${user.sub}:${storeId}`;
+      const cachedBankSettings = await redis.get(cacheKey);
+
+      if (cachedBankSettings)
+        return res.status(200).json({
+          success: true,
+          message: "store banks fetch successful",
+          data: JSON.parse(cachedBankSettings),
+        });
+
+      const foundBankSettings = await prisma.store.findFirst({
+        where: {
+          id: storeId,
+          storeMemberships: {
+            some: {
+              user_id: Number(user.sub),
+            },
+          },
+        },
+        select: {
+          bankAccounts: true,
+        },
+      });
+
+      if (!foundBankSettings)
+        return res
+          .status(404)
+          .json({ success: false, message: "Bank settings not found" });
+
+      await redis.set(
+        cacheKey,
+        JSON.stringify(foundBankSettings),
+        "EX",
+        4 * 60 * 60,
+      );
+
+      return res.status(200).json({
+        message: "Fetch successful",
+        success: true,
+        data: foundBankSettings,
+      });
+    } catch (err) {
+      console.error("Error fetching store banks:", err);
+      return res
+        .status(500)
+        .json({ success: false, message: "Problem fetching store banks" });
     }
   },
 );
