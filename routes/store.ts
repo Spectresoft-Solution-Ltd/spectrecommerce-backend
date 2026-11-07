@@ -12,6 +12,7 @@ import {
   uploadStoreImagesToCloudinary,
   validateBankAccountInput,
   validateBankFetchQuery,
+  validateCurrencyInputs,
   validateparam,
   validateQuery,
   validateStoreAppearanceInputs,
@@ -22,10 +23,10 @@ import {
   Members,
   PaymentProviders,
 } from "../utils/types/store.js";
-import { createCipheriv, createDecipheriv, randomBytes } from "node:crypto";
 import { encryptData } from "../utils/algorithm/index.js";
 import { upload } from "../lib/multer.js";
 import multer from "multer";
+import { Currency } from "../generated/prisma/enums.js";
 
 const router = Router();
 
@@ -49,6 +50,8 @@ router.post(
         members = [],
         bank_accounts = [],
         payment_providers = [],
+        default_currency,
+        currencies = [],
       } = req.body;
 
       const foundSlug = await prisma.store.findUnique({ where: { slug } });
@@ -108,6 +111,8 @@ router.post(
           name,
           description,
           slug,
+          storeCurrencies: currencies,
+          default_currency,
           storeMemberships: {
             create: constructedMembers.map((member) => ({
               role: member.role,
@@ -576,6 +581,61 @@ router.get(
       return res
         .status(500)
         .json({ success: false, message: "Problem fetching store banks" });
+    }
+  },
+);
+
+router.post(
+  "/store/settings/currency",
+  authenticateAndVerifyCsrf,
+  validateCurrencyInputs,
+  requireStorePermission("UPDATE_STORE_CURRENCIES"),
+  async (req: Request, res: Response) => {
+    try {
+      const user = req.user;
+      if (!user)
+        return res
+          .status(401)
+          .json({ success: false, message: "Authentication required!" });
+
+      const { id } = req.query;
+      const { default_currency, currencies = [] } = req.body;
+      const storeId = Number(id);
+      const cacheKey = `redis_store:${user.username}:${storeId}`;
+
+      await prisma.store.update({
+        where: {
+          id: storeId,
+          storeMemberships: {
+            some: {
+              user_id: Number(user.sub),
+            },
+          },
+        },
+        data: {
+          default_currency,
+          storeCurrencies: {
+            createMany: {
+              data: currencies.map((currency: Currency) => ({
+                currency,
+              })),
+              skipDuplicates: true,
+            },
+          },
+        },
+      });
+
+      await redis.del(cacheKey);
+
+      return res.status(200).json({
+        success: true,
+        message: "store currencies updated successfully",
+      });
+    } catch (err) {
+      console.error("Problem setting store currency:", err);
+      return res
+        .status(500)
+        .json({ success: false, message: "Pproblem setting store currency!" });
     }
   },
 );

@@ -21,6 +21,8 @@ const validateStoreInput = async (
       name: z.string(),
       description: z.string(),
       slug: z.string(),
+      default_currency: z.enum(["NAIRA", "DOLLAR"]).optional(),
+      currencies: z.array(z.enum(["NAIRA", "DOLLAR"])).optional(),
 
       members: z
         .array(
@@ -366,6 +368,45 @@ const validateBankFetchQuery = async (
   }
 };
 
+const validateCurrencyInputs = async (
+  req: Request,
+  res: Response,
+  next: NextFunction,
+) => {
+  try {
+    const inputSchema = z
+      .object({
+        default_currency: z.enum(["NAIRA", "DOLLAR"]),
+        currencies: z.array(z.enum(["NAIRA", "DOLLAR"])),
+      })
+      .partial();
+
+    const result = inputSchema.safeParse(req.body);
+    if (!result.success) {
+      return res.status(400).json({
+        message: "invalid or missing request body",
+        errors: z.treeifyError(result.error),
+      });
+    }
+
+    const param = z.string().safeParse(req.query);
+    if (!param.success) {
+      return res.status(400).json({
+        message: "invalid or missing request body",
+        errors: z.treeifyError(param.error),
+      });
+    }
+
+    req.body = result.data;
+    next();
+  } catch (err) {
+    console.error("Problem validating bank currency");
+    return res
+      .status(500)
+      .json({ success: false, message: "Failed to validate currency inputs" });
+  }
+};
+
 const requireStorePermission = (permission: StorePermission) => {
   return async (req: Request, res: Response, next: NextFunction) => {
     try {
@@ -435,4 +476,5 @@ export {
   requireStorePermission,
   validateBankAccountInput,
   validateBankFetchQuery,
+  validateCurrencyInputs,
 };

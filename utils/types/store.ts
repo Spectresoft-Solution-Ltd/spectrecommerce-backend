@@ -22,3 +22,8 @@ enum Role {
   "ADMIN",
   "STAFF",
 }
+
+export enum Currency {
+  "DOLLAR",
+  "NAIRA",
+}
