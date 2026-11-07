@@ -14,6 +14,7 @@ import {
   validateBankFetchQuery,
   validateCurrencyInputs,
   validateparam,
+  validateProviderConfigInputs,
   validateQuery,
   validateStoreAppearanceInputs,
   validateStoreInput,
@@ -585,11 +586,11 @@ router.get(
   },
 );
 
-router.post(
+router.patch(
   "/store/settings/currency",
   authenticateAndVerifyCsrf,
-  validateCurrencyInputs,
   requireStorePermission("UPDATE_STORE_CURRENCIES"),
+  validateCurrencyInputs,
   async (req: Request, res: Response) => {
     try {
       const user = req.user;
@@ -635,7 +636,68 @@ router.post(
       console.error("Problem setting store currency:", err);
       return res
         .status(500)
-        .json({ success: false, message: "Pproblem setting store currency!" });
+        .json({ success: false, message: "Problem setting store currency!" });
+    }
+  },
+);
+
+router.patch(
+  "/store/settings/providers",
+  authenticateAndVerifyCsrf,
+  requireStorePermission("UPDATE_STORE_BANK_ACCOUNTS"),
+  validateProviderConfigInputs,
+  async (req: Request, res: Response) => {
+    try {
+      const user = req.user;
+      if (!user)
+        return res
+          .status(401)
+          .json({ success: false, message: "Authentication required!" });
+
+      const { payment_providers = [] } = req.body;
+      const { id } = req.query;
+      const storeId = Number(id);
+
+      await prisma.$transaction(
+        payment_providers.map((provider: PaymentProviders) => {
+          const { id, secret_key, ...data } = provider;
+
+          if (id) {
+            return prisma.storePaymentProvider.updateMany({
+              where: {
+                id: Number(id),
+                store_id: storeId,
+              },
+              data: {
+                ...data,
+                ...(secret_key && {
+                  secret_key: encryptData(secret_key),
+                }),
+              },
+            });
+          }
+
+          return prisma.storePaymentProvider.create({
+            data: {
+              ...data,
+              secret_key: secret_key ? encryptData(secret_key) : "",
+              is_enabled: data.is_enabled ? true : false,
+              webhook_secret: "",
+              store_id: storeId,
+            },
+          });
+        }),
+      );
+
+      return res.status(200).json({
+        success: true,
+        message: "store payment providers updated successfully",
+      });
+    } catch (err) {
+      console.error("Problem configuring store provider");
+      return res
+        .status(500)
+        .json({ message: "Problem configuring store provider" });
     }
   },
 );

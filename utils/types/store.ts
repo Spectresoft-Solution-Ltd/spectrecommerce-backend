@@ -12,6 +12,7 @@ export interface BankAccouts {
 }
 
 export interface PaymentProviders {
+  id?: string;
   provider: string;
   public_key: string;
   secret_key: string;

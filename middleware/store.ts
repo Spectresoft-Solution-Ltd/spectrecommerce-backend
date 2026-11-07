@@ -389,10 +389,10 @@ const validateCurrencyInputs = async (
       });
     }
 
-    const param = z.string().safeParse(req.query);
+    const param = z.string().safeParse(req.query.id);
     if (!param.success) {
       return res.status(400).json({
-        message: "invalid or missing request body",
+        message: "query parameter missing",
         errors: z.treeifyError(param.error),
       });
     }
@@ -404,6 +404,51 @@ const validateCurrencyInputs = async (
     return res
       .status(500)
       .json({ success: false, message: "Failed to validate currency inputs" });
+  }
+};
+
+const validateProviderConfigInputs = async (
+  req: Request,
+  res: Response,
+  next: NextFunction,
+) => {
+  try {
+    const inputSchema = z
+      .array(
+        z.object({
+          id: z.string().optional(),
+          provider: z.string().min(1),
+          public_key: z.string().min(1),
+          secret_key: z.string().min(1),
+          is_enabled: z.boolean().default(true),
+        }),
+      )
+      .min(1, "add a payment configuration");
+
+    const result = inputSchema.safeParse(req.body);
+    if (!result.success) {
+      return res.status(400).json({
+        message: "invalid or missing request body",
+        errors: z.treeifyError(result.error),
+      });
+    }
+
+    const param = z.string().safeParse(req.query.id);
+    if (!param.success) {
+      return res.status(400).json({
+        message: "iquery parameter missing",
+        errors: z.treeifyError(param.error),
+      });
+    }
+
+    req.body = result.data;
+    next();
+  } catch (err) {
+    console.error("Problem validating store payment config:", err);
+    res.status(500).json({
+      message: "Problem validation store payment config inputs",
+      success: false,
+    });
   }
 };
 
@@ -477,4 +522,5 @@ export {
   validateBankAccountInput,
   validateBankFetchQuery,
   validateCurrencyInputs,
+  validateProviderConfigInputs,
 };
