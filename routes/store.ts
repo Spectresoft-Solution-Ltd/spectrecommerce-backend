@@ -187,6 +187,9 @@ router.get(
             },
           },
         },
+        include: {
+          products: true,
+        },
       });
 
       if (!foundStores || !foundStores.length)
@@ -200,6 +203,7 @@ router.get(
         description: item.description,
         slug: item.slug,
         status: item.status,
+        products: item.products,
       }));
 
       await redis.set(cacheKey, JSON.stringify(store), "EX", 4 * 60 * 60);
@@ -286,6 +290,7 @@ router.get(
 router.patch(
   "/store/settings/appearance",
   authenticateAndVerifyCsrf,
+  requireStorePermission("UPDATE_STORE_APPEARANCE"),
   upload.fields([
     { name: "cover_bg", maxCount: 5 },
     { name: "logo", maxCount: 1 },

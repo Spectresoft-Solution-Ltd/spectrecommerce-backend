@@ -3,6 +3,7 @@ export type StoreRole = "OWNER" | "ADMIN" | "STAFF";
 export type StorePermission =
   | "VIEW_STORE"
   | "UPDATE_STORE_BANK_ACCOUNTS"
+  | "UPDATE_STORE_APPEARANCE"
   | "UPDATE_STORE_CURRENCIES"
   | "MANAGE_PRODUCTS"
   | "MANAGE_CATEGORIES"
@@ -18,6 +19,7 @@ export const ROLE_PERMISSIONS: Record<StoreRole, StorePermission[]> = {
   OWNER: [
     "VIEW_STORE",
     "UPDATE_STORE_BANK_ACCOUNTS",
+    "UPDATE_STORE_APPEARANCE",
     "UPDATE_STORE_CURRENCIES",
     "MANAGE_PRODUCTS",
     "MANAGE_CATEGORIES",
@@ -33,6 +35,7 @@ export const ROLE_PERMISSIONS: Record<StoreRole, StorePermission[]> = {
   ADMIN: [
     "VIEW_STORE",
     "UPDATE_STORE_BANK_ACCOUNTS",
+    "UPDATE_STORE_APPEARANCE",
     "UPDATE_STORE_CURRENCIES",
     "MANAGE_PRODUCTS",
     "MANAGE_CATEGORIES",
