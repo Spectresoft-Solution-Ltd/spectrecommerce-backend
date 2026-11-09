@@ -10,6 +10,7 @@ import { prisma } from "../lib/prisma.js";
 import {
   requireStorePermission,
   uploadStoreImagesToCloudinary,
+  validateBankAccountDeleteInput,
   validateBankAccountInput,
   validateBankFetchQuery,
   validateCurrencyInputs,
@@ -761,6 +762,101 @@ router.patch(
       return res
         .status(500)
         .json({ message: "Problem configuring store provider" });
+    }
+  },
+);
+
+router.delete(
+  "/store/settings/bankaccounts",
+  authenticateAndVerifyCsrf,
+  validateBankAccountDeleteInput,
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const user = req.user;
+      if (!user)
+        return res
+          .status(401)
+          .json({ success: false, message: "Authentication required!" });
+
+      const { ids = [] } = req.body;
+      const { id } = req.query;
+      const storeId = Number(id);
+
+      const cacheKey = `redis_store_bankAC:${user.sub}:${storeId}`;
+      const cacheKey1 = `redis_store:${user.username}:${storeId}`;
+
+      const result = await prisma.storeBankAccount.deleteMany({
+        where: {
+          id: {
+            in: ids,
+          },
+          store_id: storeId,
+        },
+      });
+
+      if (result.count === 0) {
+        return res.status(404).json({
+          success: false,
+          message: "No matching bank account was found!",
+        });
+      }
+
+      await redis.del(cacheKey);
+      await redis.del(cacheKey1);
+
+      return res
+        .status(200)
+        .json({ success: true, message: "Delete action successful" });
+    } catch (err) {
+      console.error("Problem deleting store bank accounts");
+      return res
+        .status(500)
+        .json({ success: false, message: "Problem deleting bank account" });
+    }
+  },
+);
+
+router.delete(
+  "/store/settings/providers",
+  authenticateAndVerifyCsrf,
+  validateBankAccountDeleteInput,
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const user = req.user;
+      if (!user)
+        return res
+          .status(401)
+          .json({ success: false, message: "Authentication required!" });
+
+      const { ids = [] } = req.body;
+      const { id } = req.query;
+      const storeId = Number(id);
+
+      const result = await prisma.storePaymentProvider.deleteMany({
+        where: {
+          id: {
+            in: ids,
+          },
+          store_id: storeId,
+        },
+      });
+
+      if (result.count === 0) {
+        return res.status(404).json({
+          success: false,
+          message: "No matching payment provider configurations found!",
+        });
+      }
+
+      return res.status(200).json({
+        success: true,
+        message: "Provider configuration deletion was successful",
+      });
+    } catch (err) {
+      console.error("Problem deleting store bank accounts");
+      return res
+        .status(500)
+        .json({ success: false, message: "Problem deleting bank account" });
     }
   },
 );

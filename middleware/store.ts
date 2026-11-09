@@ -471,6 +471,88 @@ const validateProviderConfigInputs = async (
   }
 };
 
+const validateBankAccountDeleteInput = async (
+  req: Request,
+  res: Response,
+  next: NextFunction,
+) => {
+  try {
+    const inputSchema = z.object({
+      ids: z
+        .array(z.number())
+        .min(1, "include a bank account id")
+        .refine((ids) => new Set(ids).size === ids.length, {
+          message: "Duplicate bank account IDs are not allowed",
+        }),
+    });
+
+    const result = inputSchema.safeParse(req.body);
+    const param = z.string().safeParse(req.query.id);
+
+    if (!param.success)
+      return res.status(400).json({
+        message: "query parameter missing!",
+        errors: z.treeifyError(param.error),
+      });
+
+    if (!result.success)
+      return res.status(400).json({
+        message: "Invalid or missing request body",
+        errors: z.treeifyError(result.error),
+      });
+
+    req.body = result.data;
+    next();
+  } catch (err) {
+    console.error("Problem validating bank account delete inputs");
+    return res.status(500).json({
+      success: false,
+      message: "Problem validating bank account delete inputs",
+    });
+  }
+};
+
+const validateProviderConfigInput = async (
+  req: Request,
+  res: Response,
+  next: NextFunction,
+) => {
+  try {
+    const inputSchema = z.object({
+      ids: z
+        .array(z.number())
+        .min(1, "add a payment configuration id")
+        .refine((ids) => new Set(ids).size === ids.length, {
+          message: "Duplicate provider IDs are not allowed",
+        }),
+    });
+
+    const result = inputSchema.safeParse(req.body);
+    const param = z.string().safeParse(req.query.id);
+
+    if (!param.success)
+      return res.status(400).json({
+        message: "query parameter missing!",
+        errors: z.treeifyError(param.error),
+      });
+
+    if (!result.success)
+      return res.status(400).json({
+        message: "Invalid or missing request body",
+        errors: z.treeifyError(result.error),
+      });
+
+    req.body = result.data;
+    next();
+  } catch (err) {
+    console.error("Problem validating provider configuration inputs");
+    return res.status(500).json({
+      success: false,
+      message: "Problem validating provider configuration inputs",
+    });
+  }
+};
+
 const requireStorePermission = (permission: StorePermission) => {
   return async (req: Request, res: Response, next: NextFunction) => {
     try {
@@ -542,4 +624,6 @@ export {
   validateBankFetchQuery,
   validateCurrencyInputs,
   validateProviderConfigInputs,
+  validateBankAccountDeleteInput,
+  validateProviderConfigInput,
 };
