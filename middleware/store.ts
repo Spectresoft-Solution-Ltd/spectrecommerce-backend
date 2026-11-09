@@ -22,7 +22,15 @@ const validateStoreInput = async (
       description: z.string(),
       slug: z.string(),
       default_currency: z.enum(["NAIRA", "DOLLAR"]).optional(),
-      currencies: z.array(z.enum(["NAIRA", "DOLLAR"])).optional(),
+      currencies: z
+        .array(z.enum(["NAIRA", "DOLLAR"]))
+        .refine(
+          (currencies) => new Set(currencies).size === currencies.length,
+          {
+            message: "Currencies must not contain duplicates",
+          },
+        )
+        .optional(),
 
       members: z
         .array(
@@ -376,10 +384,21 @@ const validateCurrencyInputs = async (
   try {
     const inputSchema = z
       .object({
-        default_currency: z.enum(["NAIRA", "DOLLAR"]),
-        currencies: z.array(z.enum(["NAIRA", "DOLLAR"])),
+        default_currency: z.enum(["NAIRA", "DOLLAR"]).optional(),
+        currencies: z
+          .array(z.enum(["NAIRA", "DOLLAR"]))
+          .refine((values) => new Set(values).size === values.length, {
+            message: "Duplicate currencies are not allowed",
+          })
+          .optional(),
       })
-      .partial();
+      .refine(
+        (data) =>
+          data.default_currency !== undefined || data.currencies !== undefined,
+        {
+          message: "At least one currency field must be provided",
+        },
+      );
 
     const result = inputSchema.safeParse(req.body);
     if (!result.success) {
@@ -467,7 +486,7 @@ const requireStorePermission = (permission: StorePermission) => {
       const user_id = Number(user.sub);
       const store_id = Number(req.query.id);
 
-      if (!Number.isInteger(store_id) || store_id <= 0) {
+      if (!store_id || store_id <= 0) {
         return res.status(400).json({
           success: false,
           message: "Invalid store ID",

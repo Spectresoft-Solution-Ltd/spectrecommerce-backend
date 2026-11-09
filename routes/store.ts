@@ -107,12 +107,18 @@ router.post(
         }),
       );
 
+      const uniqueCurrencies = [...new Set(currencies ?? [])] as Currency[];
+
       await prisma.store.create({
         data: {
           name,
           description,
           slug,
-          storeCurrencies: currencies,
+          storeCurrencies: {
+            create: uniqueCurrencies.map((currency: Currency) => ({
+              currency,
+            })),
+          },
           default_currency,
           storeMemberships: {
             create: constructedMembers.map((member) => ({
@@ -456,6 +462,7 @@ router.patch(
       const storeId = Number(req.query.id);
       const { bank_accounts = [] } = req.body;
       const cacheKey = `redis_store_bankAC:${user.sub}:${storeId}`;
+      const cacheKey1 = `redis_store:${user.username}:${storeId}`;
 
       if (!Number.isInteger(storeId) || storeId <= 0) {
         return res.status(400).json({
@@ -504,6 +511,7 @@ router.patch(
       );
 
       await redis.del(cacheKey);
+      await redis.del(cacheKey1);
 
       return res.status(200).json({
         success: true,
@@ -604,27 +612,77 @@ router.patch(
       const storeId = Number(id);
       const cacheKey = `redis_store:${user.username}:${storeId}`;
 
-      await prisma.store.update({
-        where: {
-          id: storeId,
-          storeMemberships: {
-            some: {
-              user_id: Number(user.sub),
+      const result = await prisma.$transaction(async (tx) => {
+        // 1. Find the store and its existing currencies
+        const store = await tx.store.findFirst({
+          where: {
+            id: storeId,
+            storeMemberships: {
+              some: {
+                user_id: Number(user.sub),
+              },
             },
           },
-        },
-        data: {
-          default_currency,
-          storeCurrencies: {
-            createMany: {
-              data: currencies.map((currency: Currency) => ({
-                currency,
-              })),
-              skipDuplicates: true,
+          select: {
+            id: true,
+            storeCurrencies: {
+              select: {
+                currency: true,
+              },
             },
           },
-        },
+        });
+
+        if (!store) {
+          return {
+            error: "Store not found!",
+            status: 404,
+            success: false,
+          };
+        }
+
+        // 2. Combine existing currencies with incoming currencies
+        const availableCurrencies = new Set<Currency>([
+          ...store.storeCurrencies.map((item) => item.currency),
+          ...currencies,
+        ]);
+
+        // 3. Ensure default currency belongs to the store
+        if (default_currency && !availableCurrencies.has(default_currency)) {
+          return {
+            error: `${default_currency} is not an available currency for this store!`,
+            status: 400,
+            success: false,
+          };
+        }
+
+        // 4. Update store currencies and default currency
+        await tx.store.update({
+          where: {
+            id: storeId,
+          },
+          data: {
+            ...(default_currency && { default_currency }),
+            storeCurrencies: {
+              createMany: {
+                data: currencies.map((currency: Currency) => ({
+                  currency,
+                })),
+                skipDuplicates: true,
+              },
+            },
+          },
+        });
+
+        return { success: true, status: 200 };
       });
+
+      if ("error" in result) {
+        return res.status(result.status).json({
+          success: false,
+          message: result.error,
+        });
+      }
 
       await redis.del(cacheKey);
 
