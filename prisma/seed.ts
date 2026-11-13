@@ -47,6 +47,8 @@ interface ProductRef {
   id: number;
   name: string;
   price: bigint;
+  description: string;
+  image: string;
 }
 
 const plans = [
@@ -330,7 +332,10 @@ async function seedStores(userMap: Record<string, { id: number }>) {
     for (const m of s.members) {
       await prisma.storeMembership.upsert({
         where: {
-          store_id_user_id: { store_id: store.id, user_id: userMap[m.username].id },
+          store_id_user_id: {
+            store_id: store.id,
+            user_id: userMap[m.username].id,
+          },
         },
         update: { role: m.role },
         create: {
@@ -374,7 +379,9 @@ async function seedStores(userMap: Record<string, { id: number }>) {
 
     if (s.paystack) {
       const provider = await prisma.storePaymentProvider.upsert({
-        where: { store_id_provider: { store_id: store.id, provider: "paystack" } },
+        where: {
+          store_id_provider: { store_id: store.id, provider: "paystack" },
+        },
         update: { is_enabled: true },
         create: {
           store_id: store.id,
@@ -447,7 +454,11 @@ async function seedStores(userMap: Record<string, { id: number }>) {
       });
       if (!existingImage) {
         await prisma.productImages.create({
-          data: { product_id: product.id, image_url: p.image, alt_text: p.name },
+          data: {
+            product_id: product.id,
+            image_url: p.image,
+            alt_text: p.name,
+          },
         });
       }
 
@@ -455,6 +466,8 @@ async function seedStores(userMap: Record<string, { id: number }>) {
         id: product.id,
         name: p.name,
         price: p.prices.NAIRA ?? 0n,
+        description: p.description,
+        image: p.image,
       };
     }
 
@@ -517,6 +530,8 @@ async function createOrder(args: {
           unit_price: item.ref.price,
           quantity: item.quantity,
           userId: args.userId,
+          product_description: item.ref.description,
+          product_image: item.ref.image,
         },
       });
     }
@@ -706,7 +721,10 @@ async function seedCartAndOrders(
       event_id: "evt_seed_0002",
       event_type: "charge.success",
       status: "FAILED",
-      payload: { event: "charge.success", data: { reference: "PAY-SEED-0004" } },
+      payload: {
+        event: "charge.success",
+        data: { reference: "PAY-SEED-0004" },
+      },
       failure_reason: "Order was cancelled before the webhook was processed",
       attempts: 3,
     },

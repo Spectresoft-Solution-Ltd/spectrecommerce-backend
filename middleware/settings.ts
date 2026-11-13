@@ -2,6 +2,7 @@ import * as z from "zod";
 import { type Request, type Response, type NextFunction } from "express";
 import { cloudinary } from "../lib/cloudinanry.js";
 import type { UploadApiResponse } from "cloudinary";
+import { CloudinaryRequest } from "../utils/types/index.js";
 import multer from "multer";
 
 const validateSettingsInput = (
@@ -40,10 +41,6 @@ const validateSettingsInput = (
       .json({ success: false, message: "failed to validate settings input" });
   }
 };
-
-export interface CloudinaryRequest extends Request {
-  cloudinaryUpload?: UploadApiResponse;
-}
 
 const uploadProfileCoverToCloudinary = async (
   req: CloudinaryRequest,

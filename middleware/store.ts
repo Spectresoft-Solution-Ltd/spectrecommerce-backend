@@ -2,8 +2,8 @@ import * as z from "zod";
 import { type Request, type Response, type NextFunction } from "express";
 import { UploadApiResponse } from "cloudinary";
 import sharp from "sharp";
-import { randomUUID } from "node:crypto";
 import { uploadToCloudinary } from "../utils/functions/index.js";
+import { CloudinaryRequest } from "../utils/types/index.js";
 import { cloudinary } from "../lib/cloudinanry.js";
 import { prisma } from "../lib/prisma.js";
 import {
@@ -207,10 +207,6 @@ const validateStoreAppearanceInputs = async (
     });
   }
 };
-
-export interface CloudinaryRequest extends Request {
-  cloudinaryUpload?: UploadApiResponse;
-}
 
 const uploadStoreImagesToCloudinary = async (
   req: CloudinaryRequest,

@@ -110,7 +110,7 @@ router.post(
 
       const uniqueCurrencies = [...new Set(currencies ?? [])] as Currency[];
 
-      await prisma.store.create({
+      const store = await prisma.store.create({
         data: {
           name,
           description,
@@ -136,6 +136,18 @@ router.post(
           },
           storepaymentproviders: {
             create: encryptedProvider,
+          },
+        },
+      });
+
+      await prisma.category.create({
+        data: {
+          name: "all",
+          slug: "all",
+          store: {
+            connect: {
+              id: store.id,
+            },
           },
         },
       });

@@ -155,16 +155,18 @@ model Orders {
 }
 
 model OrderItems {
-  id           Int      @id @default(autoincrement())
-  order_id     Int
-  order        Orders   @relation(fields: [order_id], references: [id])
-  product_id   Int?
-  product      Product? @relation(fields: [product_id], references: [id], onDelete: SetNull)
-  product_name String
-  unit_price   BigInt // kobo or cent
-  quantity     Int
-  user         User?    @relation(fields: [userId], references: [id])
-  userId       Int?
+  id                  Int      @id @default(autoincrement())
+  order_id            Int
+  order               Orders   @relation(fields: [order_id], references: [id])
+  product_id          Int?
+  product             Product? @relation(fields: [product_id], references: [id], onDelete: SetNull)
+  product_name        String
+  product_image       String
+  product_description String
+  unit_price          BigInt // kobo or cent
+  quantity            Int
+  user                User?    @relation(fields: [userId], references: [id])
+  userId              Int?
 }
 
 model Payment {
