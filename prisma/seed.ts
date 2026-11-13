@@ -10,7 +10,15 @@ type OrderStatusCode =
   | "DELIVERED"
   | "CANCELLED";
 
-type RefundStatusCode = "PENDING" | "APPROVED" | "REJECTED" | "COMPLETED";
+type RefundStatusCode =
+  | "PENDING"
+  | "APPROVED"
+  | "RECEIVED"
+  | "PROCESSING"
+  | "COMPLETED"
+  | "REJECTED"
+  | "CANCELLED"
+  | "FAILED";
 
 interface SeedProduct {
   name: string;
@@ -546,14 +554,18 @@ async function createRefund(args: {
   storeId: number;
   orderId: number;
   paymentId?: number;
-  requestedByUserId: number;
+  requestedByUserId?: number; // omit for guest requests
+  customerName: string;
   reviewedByUserId?: number;
   reason: string;
   customerNote?: string;
   merchantNote?: string;
+  payoutDetails?: string;
+  providerReference?: string;
   amount: bigint;
   status: RefundStatusCode;
   reviewedAt?: Date;
+  receivedAt?: Date;
   completedAt?: Date;
   items: {
     orderItemId: number;
@@ -573,14 +585,18 @@ async function createRefund(args: {
       order_id: args.orderId,
       payment_id: args.paymentId,
       requested_by_user_id: args.requestedByUserId,
+      customer_name: args.customerName,
       reviewed_by_user_id: args.reviewedByUserId,
       reason: args.reason,
       customer_note: args.customerNote,
       merchant_note: args.merchantNote,
+      payout_details: args.payoutDetails,
+      provider_reference: args.providerReference,
       amount: args.amount,
       currency: "NAIRA",
       status: args.status,
       reviewed_at: args.reviewedAt,
+      received_at: args.receivedAt,
       completed_at: args.completedAt,
       items: {
         create: args.items.map((i) => ({
@@ -814,6 +830,58 @@ async function seedCartAndOrders(
     },
   });
 
+  // Delivered orders that the refund examples below are raised against
+  const delivered: Record<
+    string,
+    { order: { id: number; total: bigint }; payment: { id: number } }
+  > = {};
+  for (const d of [
+    { n: "1006", method: "BANK_TRANSFER", status: "SUCCESSFUL" },
+    { n: "1007", method: "PROVIDER", status: "SUCCESSFUL" },
+    { n: "1008", method: "PROVIDER", status: "SUCCESSFUL" },
+    { n: "1009", method: "PROVIDER", status: "REFUNDED" },
+  ] as const) {
+    const order = await createOrder({
+      storeId,
+      userId: customer.id,
+      email: customer.email,
+      orderNumber: `ORD-${d.n}`,
+      status: "DELIVERED",
+      shippingFee: 250000n,
+      items: [{ ref: charger, quantity: 1 }],
+    });
+    const isProvider = d.method === "PROVIDER";
+    const payment = await prisma.payment.upsert({
+      where: { reference: `PAY-SEED-${d.n}` },
+      update: {},
+      create: {
+        order_id: order.id,
+        store_id: storeId,
+        userId: customer.id,
+        reference: `PAY-SEED-${d.n}`,
+        payment_method: d.method,
+        amount: order.total,
+        currency: "NAIRA",
+        status: d.status,
+        paid_at: new Date(),
+        verified_at: new Date(),
+        ...(isProvider
+          ? {
+              provider_config_id: providerId,
+              provider_reference: `psk_seed_${d.n}`,
+              verification_source: "PROVIDER_WEBHOOK" as const,
+            }
+          : {
+              submitted_at: new Date(),
+              proof_url: "https://placehold.co/600x800?text=Transfer+Receipt",
+              verified_by_user_id: merchant.id,
+              verification_source: "MANUAL" as const,
+            }),
+      },
+    });
+    delivered[d.n] = { order, payment };
+  }
+
   console.log("Seeded cart, 5 orders, payments and webhook events");
 
   const itemFor = (orderId: number, productId: number) =>
@@ -829,6 +897,7 @@ async function seedCartAndOrders(
     requestedByUserId: customer.id,
     reason: "Charger stopped working after a week",
     customerNote: "It no longer charges my phone.",
+    customerName: "Chidi Okafor",
     amount: charger.price,
     status: "PENDING",
     items: [
@@ -841,26 +910,48 @@ async function seedCartAndOrders(
     ],
   });
 
-  // Refund 2: COMPLETED. Cancelled order, payment already REFUNDED,
-  // unit returned to stock.
-  const payment4 = await prisma.payment.findUniqueOrThrow({
-    where: { reference: "PAY-SEED-0004" },
-  });
+  // Refund 2: APPROVED. Merchant accepted; customer is sending the goods back.
+  // Bank transfer order, so the customer supplied payout details.
   await createRefund({
     storeId,
-    orderId: order4.id,
-    paymentId: payment4.id,
+    orderId: delivered["1006"].order.id,
+    paymentId: delivered["1006"].payment.id,
     requestedByUserId: customer.id,
+    customerName: "Chidi Okafor",
     reviewedByUserId: merchant.id,
-    reason: "Cancelled order, full refund",
-    merchantNote: "Refunded to original payment method.",
-    amount: order4.total,
-    status: "COMPLETED",
+    reason: "Charger is not the one I ordered",
+    merchantNote: "Accepted. Rider will collect it on Monday.",
+    payoutDetails: "GTBank, 0987654321, Chidi Okafor",
+    amount: charger.price,
+    status: "APPROVED",
     reviewedAt: new Date(),
-    completedAt: new Date(),
     items: [
       {
-        orderItemId: (await itemFor(order4.id, charger.id)).id,
+        orderItemId: (await itemFor(delivered["1006"].order.id, charger.id)).id,
+        quantity: 1,
+        amount: charger.price,
+        restockQuantity: 0,
+      },
+    ],
+  });
+
+  // Refund 3: RECEIVED. Goods are back with the merchant, payout not started.
+  await createRefund({
+    storeId,
+    orderId: delivered["1007"].order.id,
+    paymentId: delivered["1007"].payment.id,
+    requestedByUserId: customer.id,
+    customerName: "Chidi Okafor",
+    reviewedByUserId: merchant.id,
+    reason: "Charger overheats",
+    merchantNote: "Item received and inspected.",
+    amount: charger.price,
+    status: "RECEIVED",
+    reviewedAt: new Date(),
+    receivedAt: new Date(),
+    items: [
+      {
+        orderItemId: (await itemFor(delivered["1007"].order.id, charger.id)).id,
         quantity: 1,
         amount: charger.price,
         restockQuantity: 1,
@@ -868,26 +959,81 @@ async function seedCartAndOrders(
     ],
   });
 
-  // Refund 3: REJECTED. Requested while the order was still processing.
+  // Refund 4: PROCESSING. Paystack refund started, waiting for the webhook.
   await createRefund({
     storeId,
-    orderId: order5.id,
+    orderId: delivered["1008"].order.id,
+    paymentId: delivered["1008"].payment.id,
     requestedByUserId: customer.id,
+    customerName: "Chidi Okafor",
+    reviewedByUserId: merchant.id,
+    reason: "Charger is too slow",
+    providerReference: "RFD-SEED-1008",
+    amount: charger.price,
+    status: "PROCESSING",
+    reviewedAt: new Date(),
+    receivedAt: new Date(),
+    items: [
+      {
+        orderItemId: (await itemFor(delivered["1008"].order.id, charger.id)).id,
+        quantity: 1,
+        amount: charger.price,
+        restockQuantity: 1,
+      },
+    ],
+  });
+
+  // Refund 5: COMPLETED. Paystack confirmed; payment marked REFUNDED.
+  await createRefund({
+    storeId,
+    orderId: delivered["1009"].order.id,
+    paymentId: delivered["1009"].payment.id,
+    requestedByUserId: customer.id,
+    customerName: "Chidi Okafor",
+    reviewedByUserId: merchant.id,
+    reason: "Charger arrived damaged",
+    merchantNote: "Refunded to original payment method.",
+    providerReference: "RFD-SEED-1009",
+    amount: charger.price,
+    status: "COMPLETED",
+    reviewedAt: new Date(),
+    receivedAt: new Date(),
+    completedAt: new Date(),
+    items: [
+      {
+        orderItemId: (await itemFor(delivered["1009"].order.id, charger.id)).id,
+        quantity: 1,
+        amount: charger.price,
+        restockQuantity: 1,
+      },
+    ],
+  });
+
+  // Refund 6: REJECTED. Phone from the delivered order, outside the return window.
+  await createRefund({
+    storeId,
+    orderId: order1.id,
+    requestedByUserId: customer.id,
+    customerName: "Chidi Okafor",
     reviewedByUserId: merchant.id,
     reason: "Changed my mind",
-    merchantNote: "Order is already being processed for shipping.",
-    amount: charger.price,
+    merchantNote: "Outside the 7-day return window.",
+    amount: phone.price,
     status: "REJECTED",
     reviewedAt: new Date(),
     items: [
       {
-        orderItemId: (await itemFor(order5.id, charger.id)).id,
+        orderItemId: (await itemFor(order1.id, phone.id)).id,
         quantity: 1,
-        amount: charger.price,
+        amount: phone.price,
         restockQuantity: 0,
       },
     ],
   });
+
+  console.log(
+    "Seeded cart, 9 orders, payments, webhook events and 6 refund requests",
+  );
 
   -console.log("Seeded cart, 5 orders, payments and webhook events");
   console.log(

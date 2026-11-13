@@ -31,7 +31,7 @@ model User {
   storeMemberships        StoreMembership[]
   profiles                Profile[]
   payments                Payment[]
-  refundRequests          RefundRequest[]
+  refundRequests          RefundRequest[] /// Don't update this!
   refundRequestsSubmitted RefundRequest[]   @relation("RefundRequester")
   refundRequestsReviewed  RefundRequest[]   @relation("RefundReviewer")
 }
@@ -350,8 +350,13 @@ model RefundRequest {
   payment_id Int?
   payment    Payment? @relation(fields: [payment_id], references: [id])
 
-  requested_by_user_id Int
-  requested_by         User @relation("RefundRequester", fields: [requested_by_user_id], references: [id])
+  requested_by_user_id Int?
+  requested_by         User? @relation("RefundRequester", fields: [requested_by_user_id], references: [id])
+
+  customer_name String
+
+  provider_reference String? // e.g. Paystack refund id or manual transfer ref
+  payout_details     String?
 
   reviewed_by_user_id Int?
   reviewed_by         User? @relation("RefundReviewer", fields: [reviewed_by_user_id], references: [id])
@@ -367,6 +372,7 @@ model RefundRequest {
 
   reviewed_at  DateTime?
   completed_at DateTime?
+  received_at  DateTime?
 
   items RefundRequestItem[]
 
@@ -406,8 +412,12 @@ model RefundRequestItem {
 enum RefundStatus {
   PENDING
   APPROVED
+  RECEIVED
+  PROCESSING
   REJECTED
   COMPLETED
+  CANCELLED
+  FAILED
 }
 
 enum PaymentMethods {
