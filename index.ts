@@ -7,10 +7,7 @@ import express, {
 } from "express";
 import "dotenv/config";
 import cookieParser from "cookie-parser";
-import {
-  doubleCsrfProtection,
-  invalidCsrfTokenError,
-} from "./lib/doublecsrf.js";
+import { invalidCsrfTokenError } from "./lib/doublecsrf.js";
 import api from "./routes/index.js";
 
 const app = express();
@@ -19,8 +16,6 @@ app.use(cookieParser());
 
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
-
-// app.use(doubleCsrfProtection);
 
 app.use(api);
 
@@ -35,7 +30,7 @@ app.use((err: unknown, _req: Request, res: Response, next: NextFunction) => {
 
 app.use((_req, res) => res.status(404).json({ message: "not found" }));
 
-app.get("/", async (req: Request, res: Response, next: NextFunction) => {
+app.get("/", async (req: Request, res: Response) => {
   try {
     console.log("Action successful at get route");
     res.send("Hell get");

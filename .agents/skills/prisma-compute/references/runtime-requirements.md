@@ -60,8 +60,12 @@ Scale to zero closes idle database connections. A long-lived client that treats 
 
 ```ts
 const sql = new SQL({ url: db.url, max: 1, idleTimeout: 10 });
-process.on("uncaughtException", (err) => console.error("uncaughtException", err));
-process.on("unhandledRejection", (err) => console.error("unhandledRejection", err));
+process.on("uncaughtException", (err) =>
+  console.error("uncaughtException", err),
+);
+process.on("unhandledRejection", (err) =>
+  console.error("unhandledRejection", err),
+);
 ```
 
 A call into a sleeping service can get `ECONNRESET` during the cold start; retry it. The generated Composer RPC client already does.
@@ -89,7 +93,9 @@ The caller gets a `504` after 60 seconds, and the instance can sleep while the w
 ```ts
 app.post("/webhook", async (c) => {
   const job = await c.req.json();
-  waitUntil(processForTwoMinutes(job), { signal: AbortSignal.timeout(5 * 60_000) });
+  waitUntil(processForTwoMinutes(job), {
+    signal: AbortSignal.timeout(5 * 60_000),
+  });
   return c.body(null, 202);
 });
 ```

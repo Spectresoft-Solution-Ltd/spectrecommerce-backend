@@ -20,11 +20,11 @@ export interface PaymentProviders {
 }
 
 enum Role {
-  "ADMIN",
-  "STAFF",
+  ADMIN,
+  STAFF,
 }
 
 export enum Currency {
-  "DOLLAR",
-  "NAIRA",
+  DOLLAR,
+  NAIRA,
 }

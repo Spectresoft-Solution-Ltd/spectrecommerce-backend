@@ -18,28 +18,28 @@ Verified with `create-prisma` 0.14.1.
 npx create-prisma@latest --help
 ```
 
-| Flag | Meaning |
-|------|---------|
-| `[project-name]`, `--name` | Project directory and root module name |
-| `--template` | `minimal`, `hono`, `elysia`, `nest`, `next`, `turborepo`, `svelte`, `astro`, `nuxt`, `tanstack-start` |
-| `--provider` | `postgres` or `mongo` |
-| `--authoring` | `psl` or `typescript` for the data contract |
-| `--package-manager` | `npm`, `pnpm`, `yarn`, `bun`, `deno` |
-| `--deploy` | Build and deploy after scaffolding |
-| `--workspace` | Workspace id or name to deploy into |
-| `--skills` | Agents to install package skills for (`claude,cursor,agents,devin`), or `none` |
-| `--yes` | Accept defaults; does not deploy |
-| `--json` | One JSON result, non-interactive; deploys unless `--no-deploy` |
+| Flag                       | Meaning                                                                                               |
+| -------------------------- | ----------------------------------------------------------------------------------------------------- |
+| `[project-name]`, `--name` | Project directory and root module name                                                                |
+| `--template`               | `minimal`, `hono`, `elysia`, `nest`, `next`, `turborepo`, `svelte`, `astro`, `nuxt`, `tanstack-start` |
+| `--provider`               | `postgres` or `mongo`                                                                                 |
+| `--authoring`              | `psl` or `typescript` for the data contract                                                           |
+| `--package-manager`        | `npm`, `pnpm`, `yarn`, `bun`, `deno`                                                                  |
+| `--deploy`                 | Build and deploy after scaffolding                                                                    |
+| `--workspace`              | Workspace id or name to deploy into                                                                   |
+| `--skills`                 | Agents to install package skills for (`claude,cursor,agents,devin`), or `none`                        |
+| `--yes`                    | Accept defaults; does not deploy                                                                      |
+| `--json`                   | One JSON result, non-interactive; deploys unless `--no-deploy`                                        |
 
 When to deploy:
 
-| Invocation | Deploys |
-|------------|---------|
-| `--deploy` | Yes |
-| `--json` without `--no-deploy` | Yes |
-| `--yes` without `--deploy` or `--json` | No |
-| Interactive | Asks |
-| `--package-manager deno` | Never; no Composer files are generated |
+| Invocation                             | Deploys                                |
+| -------------------------------------- | -------------------------------------- |
+| `--deploy`                             | Yes                                    |
+| `--json` without `--no-deploy`         | Yes                                    |
+| `--yes` without `--deploy` or `--json` | No                                     |
+| Interactive                            | Asks                                   |
+| `--package-manager deno`               | Never; no Composer files are generated |
 
 For an unattended scaffold with no deploy, pass both:
 

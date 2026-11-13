@@ -7,7 +7,6 @@ import {
   validateProductCreateInput,
 } from "../middleware/products.js";
 import { upload } from "../lib/multer.js";
-import multer from "multer";
 import { prisma } from "../lib/prisma.js";
 import { Product_prices } from "../utils/types/products.js";
 import { convertToMinorUnit } from "../utils/types/index.js";
@@ -123,7 +122,7 @@ router.post(
 
       const prices = constructedBody.prices.map((item: Product_prices) => ({
         currency: item.currency,
-        amount: convertToMinorUnit(item.amount, item.currency),
+        amount: convertToMinorUnit(item.amount),
       }));
 
       await prisma.product.create({

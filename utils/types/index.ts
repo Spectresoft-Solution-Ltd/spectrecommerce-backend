@@ -1,15 +1,11 @@
 import type { Request } from "express";
 import { UploadApiResponse } from "cloudinary";
-import type { Currency } from "../../generated/prisma/enums.js";
 
 export interface CloudinaryRequest extends Request {
   cloudinaryUpload?: UploadApiResponse;
 }
 
-export const convertToMinorUnit = (
-  amount: string,
-  currency: Currency,
-): bigint => {
+export const convertToMinorUnit = (amount: string): bigint => {
   const [whole, fraction = ""] = amount.split(".");
 
   return BigInt(`${whole}${fraction.padEnd(2, "0")}`);

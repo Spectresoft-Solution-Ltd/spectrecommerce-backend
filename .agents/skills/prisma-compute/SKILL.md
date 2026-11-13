@@ -26,26 +26,26 @@ The installed packages ship their own agent skills, matched to the installed ver
 
 The Compute CLI from before Composer is gone. Its commands fail with `CLI.UNKNOWN_COMMAND` (removed flags with `CLI.INVALID_ARGUMENTS`), its config files are not read, and its environment variables are ignored:
 
-| Removed | Use instead |
-|---------|-------------|
-| `@prisma/cli app deploy`, `app build`, `app run` | Your own build script, then `npx prisma deploy module.ts`; `npx prisma dev module.ts` to run locally |
-| `prisma.compute.ts`, `prisma.compute.json`, `defineComputeConfig` | `module.ts`, a `service.ts` per server declared with `compute()`, and the `composer` section of `prisma.config.ts` |
-| `init` writing a compute config | `npx prisma init` now writes a `prisma.config.ts` with only a `skills` section, adds `prisma` as a dev dependency, and syncs skills. Add the `composer` section yourself |
-| `compute:deploy` script | `npx prisma deploy module.ts`, or the `deploy` script current `create-prisma` generates |
-| `app deploy --branch <name>` | `npx prisma deploy module.ts --stage <name>` |
-| `app deploy --prod`, `--no-promote`, `app promote` | No `--stage` deploys production; `service version promote <version-id>` |
-| `app show`, `app open`, `app list-deploys`, `app show-deploy` | `service show <service>`, `service open <service>`, `service version list <service>`, `service version show <version-id>` |
-| `app logs` | `service logs <service>` |
-| `app rollback --to <id> --yes` | `service version rollback <service> --to <id> --confirm <id>` |
-| `app domain ...` | `service domain ... --service <service>` |
-| `app remove` | Remove the `provision()` from `module.ts` and deploy, or `service delete <service> --confirm <service>` |
-| `build logs <build-id>` | The GitHub Actions run log or the Console; `GET /v1/builds/{buildId}` for state and failing step |
-| `database ...` | `postgres ...` |
-| `project env remove` | `project env delete` |
-| `auth logout --workspace <id>` | `auth workspace logout <id>` |
-| `agent install`, `agent update`, `agent status` | `npx skills add prisma/skills --skill prisma-compute`; `npx prisma skills sync` for package skills |
-| `PRISMA_PROJECT_ID`, `PRISMA_APP_ID`, `PRISMA_SERVICE_ID` | `--project <id-or-name>`, the service as a positional argument, and `.prisma/local.json` from `project link` |
-| `/v1/apps` REST endpoints | `/v1/services` (the `/v1/apps` paths are deprecated) |
+| Removed                                                           | Use instead                                                                                                                                                              |
+| ----------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `@prisma/cli app deploy`, `app build`, `app run`                  | Your own build script, then `npx prisma deploy module.ts`; `npx prisma dev module.ts` to run locally                                                                     |
+| `prisma.compute.ts`, `prisma.compute.json`, `defineComputeConfig` | `module.ts`, a `service.ts` per server declared with `compute()`, and the `composer` section of `prisma.config.ts`                                                       |
+| `init` writing a compute config                                   | `npx prisma init` now writes a `prisma.config.ts` with only a `skills` section, adds `prisma` as a dev dependency, and syncs skills. Add the `composer` section yourself |
+| `compute:deploy` script                                           | `npx prisma deploy module.ts`, or the `deploy` script current `create-prisma` generates                                                                                  |
+| `app deploy --branch <name>`                                      | `npx prisma deploy module.ts --stage <name>`                                                                                                                             |
+| `app deploy --prod`, `--no-promote`, `app promote`                | No `--stage` deploys production; `service version promote <version-id>`                                                                                                  |
+| `app show`, `app open`, `app list-deploys`, `app show-deploy`     | `service show <service>`, `service open <service>`, `service version list <service>`, `service version show <version-id>`                                                |
+| `app logs`                                                        | `service logs <service>`                                                                                                                                                 |
+| `app rollback --to <id> --yes`                                    | `service version rollback <service> --to <id> --confirm <id>`                                                                                                            |
+| `app domain ...`                                                  | `service domain ... --service <service>`                                                                                                                                 |
+| `app remove`                                                      | Remove the `provision()` from `module.ts` and deploy, or `service delete <service> --confirm <service>`                                                                  |
+| `build logs <build-id>`                                           | The GitHub Actions run log or the Console; `GET /v1/builds/{buildId}` for state and failing step                                                                         |
+| `database ...`                                                    | `postgres ...`                                                                                                                                                           |
+| `project env remove`                                              | `project env delete`                                                                                                                                                     |
+| `auth logout --workspace <id>`                                    | `auth workspace logout <id>`                                                                                                                                             |
+| `agent install`, `agent update`, `agent status`                   | `npx skills add prisma/skills --skill prisma-compute`; `npx prisma skills sync` for package skills                                                                       |
+| `PRISMA_PROJECT_ID`, `PRISMA_APP_ID`, `PRISMA_SERVICE_ID`         | `--project <id-or-name>`, the service as a positional argument, and `.prisma/local.json` from `project link`                                                             |
+| `/v1/apps` REST endpoints                                         | `/v1/services` (the `/v1/apps` paths are deprecated)                                                                                                                     |
 
 A repository with `prisma.compute.ts` or a `compute:deploy` script was set up for the removed flow. Port it to Composer ([`app-composer-setup.md`](references/app-composer-setup.md)) instead of running the old commands.
 
@@ -60,15 +60,15 @@ A repository with `prisma.compute.ts` or a `compute:deploy` script was set up fo
 
 ## Rule Categories by Priority
 
-| Priority | Category | Impact | Prefix |
-|----------|----------|--------|--------|
-| 1 | CLI surface | CRITICAL | `cli-` |
-| 2 | App declaration | CRITICAL | `app-` |
-| 3 | Runtime | CRITICAL | `runtime-` |
-| 4 | Deploy | HIGH | `deploy-` |
-| 5 | Operations | HIGH | `ops-` |
-| 6 | Debugging | HIGH | `debug-` |
-| 7 | Automation | MEDIUM | `automation-` |
+| Priority | Category        | Impact   | Prefix        |
+| -------- | --------------- | -------- | ------------- |
+| 1        | CLI surface     | CRITICAL | `cli-`        |
+| 2        | App declaration | CRITICAL | `app-`        |
+| 3        | Runtime         | CRITICAL | `runtime-`    |
+| 4        | Deploy          | HIGH     | `deploy-`     |
+| 5        | Operations      | HIGH     | `ops-`        |
+| 6        | Debugging       | HIGH     | `debug-`      |
+| 7        | Automation      | MEDIUM   | `automation-` |
 
 ## Quick Reference
 

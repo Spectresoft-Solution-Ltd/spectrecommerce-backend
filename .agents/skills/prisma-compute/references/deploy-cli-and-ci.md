@@ -17,13 +17,13 @@ npx prisma deploy module.ts --help
 npx prisma dev module.ts --help
 ```
 
-| You want to | Run |
-|-------------|-----|
-| Run the app locally, no credentials | `npm run build && npx prisma dev module.ts` |
-| Deploy a preview | `npm run build && npx prisma deploy module.ts --stage <name>` |
-| Deploy production | `npm run build && npx prisma deploy module.ts` |
-| Deploy under another app name | `npx prisma deploy module.ts --name <name>` |
-| Write the outcome as JSON | `npx prisma deploy module.ts --report deploy-report.json` |
+| You want to                         | Run                                                           |
+| ----------------------------------- | ------------------------------------------------------------- |
+| Run the app locally, no credentials | `npm run build && npx prisma dev module.ts`                   |
+| Deploy a preview                    | `npm run build && npx prisma deploy module.ts --stage <name>` |
+| Deploy production                   | `npm run build && npx prisma deploy module.ts`                |
+| Deploy under another app name       | `npx prisma deploy module.ts --name <name>`                   |
+| Write the outcome as JSON           | `npx prisma deploy module.ts --report deploy-report.json`     |
 
 `<entry>` is the file whose default export is the root module, usually `module.ts`.
 
@@ -51,10 +51,10 @@ The deploy finds the project in the workspace by the root module name (or `--nam
 
 ## Credentials
 
-| Where | How |
-|-------|-----|
-| Workstation | `npx prisma auth login` once; later commands, including an agent's, reuse the stored session |
-| CI or headless | `PRISMA_SERVICE_TOKEN` (a workspace service token from Console settings) and `PRISMA_WORKSPACE_ID` |
+| Where                                    | How                                                                                                       |
+| ---------------------------------------- | --------------------------------------------------------------------------------------------------------- |
+| Workstation                              | `npx prisma auth login` once; later commands, including an agent's, reuse the stored session              |
+| CI or headless                           | `PRISMA_SERVICE_TOKEN` (a workspace service token from Console settings) and `PRISMA_WORKSPACE_ID`        |
 | GitHub Actions on a connected repository | OIDC through `prisma/cloud-deploy-action`; no stored secret. See [`deploy-on-push.md`](deploy-on-push.md) |
 
 A non-empty `PRISMA_SERVICE_TOKEN` takes priority over stored sessions. A set-but-empty value is an error. Never print the token; check presence with `test -n "${PRISMA_SERVICE_TOKEN:-}"`.
@@ -107,7 +107,8 @@ const result = await destroy({
   config: { value: prismaConfig.composer, file: "prisma.config.ts" },
   target: { kind: "stage", stage: "pr-42" },
 });
-if (!result.ok) throw new Error(`${result.failure.code}: ${result.failure.message}`);
+if (!result.ok)
+  throw new Error(`${result.failure.code}: ${result.failure.message}`);
 ```
 
 `config` is required in `@prisma/composer` 0.28.0: the `composer` section and the path of the file that declares it. Pass `name` when the app was deployed with `--name`. `target` is `{ kind: "stage", stage }` or `{ kind: "production" }` and has no default. Destroying a stage removes its resources, branch, and data; destroying production removes its resources and deletes the project once it is empty. Get the user's confirmation first. The deploy action's `mode: destroy` does not work against the current CLI.

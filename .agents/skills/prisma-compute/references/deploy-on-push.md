@@ -66,15 +66,15 @@ jobs:
 
 Inputs (from `action.yml` in v1.9.0):
 
-| Input | Default | Notes |
-|-------|---------|-------|
-| `build-command` | `npm run build` | Run verbatim; `none` skips the build |
-| `install-command` | auto | `npm ci` or `bun install --frozen-lockfile` from the lockfile; pnpm and yarn need an explicit value |
-| `module` | `module.ts` | The Composer entry |
-| `stage` | derived | Empty: default branch is production, other branches become a stage of the same name |
-| `working-directory` | `.` | For monorepos |
-| `prisma-version` | `8.0.0-rc.9` | Used only when the repository has no `prisma` dev dependency; otherwise the installed version deploys |
-| `mode` | `deploy` | `destroy` does not work against the current CLI |
+| Input               | Default         | Notes                                                                                                 |
+| ------------------- | --------------- | ----------------------------------------------------------------------------------------------------- |
+| `build-command`     | `npm run build` | Run verbatim; `none` skips the build                                                                  |
+| `install-command`   | auto            | `npm ci` or `bun install --frozen-lockfile` from the lockfile; pnpm and yarn need an explicit value   |
+| `module`            | `module.ts`     | The Composer entry                                                                                    |
+| `stage`             | derived         | Empty: default branch is production, other branches become a stage of the same name                   |
+| `working-directory` | `.`             | For monorepos                                                                                         |
+| `prisma-version`    | `8.0.0-rc.9`    | Used only when the repository has no `prisma` dev dependency; otherwise the installed version deploys |
+| `mode`              | `deploy`        | `destroy` does not work against the current CLI                                                       |
 
 Outputs: `outcome` (`succeeded`, `failed`, `skipped-no-credential`), `url` (root service), `urls` (JSON map of service address to URL), `build-id`, `report-path`. Repositories that are not connected can pass `PRISMA_SERVICE_TOKEN` from a secret in the step's `env`; an explicit token wins over OIDC.
 

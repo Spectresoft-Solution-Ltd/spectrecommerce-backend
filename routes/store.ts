@@ -1,9 +1,4 @@
-import {
-  Router,
-  type Request,
-  type Response,
-  type NextFunction,
-} from "express";
+import { Router, type Request, type Response } from "express";
 import { redis } from "../lib/redis.js";
 import { authenticateAndVerifyCsrf } from "../middleware/auth.js";
 import { prisma } from "../lib/prisma.js";
@@ -27,7 +22,6 @@ import {
 } from "../utils/types/store.js";
 import { encryptData } from "../utils/algorithm/index.js";
 import { upload } from "../lib/multer.js";
-import multer from "multer";
 import { Currency } from "../generated/prisma/enums.js";
 
 const router = Router();
@@ -225,7 +219,7 @@ router.get(
         .status(200)
         .json({ success: true, message: "Fetch successful", data: store });
     } catch (err) {
-      console.error("Error fetching store:, err");
+      console.error("Error fetching store:", err);
       return res
         .status(500)
         .json({ success: false, message: "Problem fetching store" });
@@ -292,7 +286,7 @@ router.get(
         .status(200)
         .json({ success: true, message: "Fetch successful", data: foundStore });
     } catch (err) {
-      console.error("Error fetching store details");
+      console.error("Error fetching store details", err);
       return res
         .status(500)
         .json({ success: false, message: "Problem fetching store details" });
@@ -452,7 +446,7 @@ router.get(
         data: foundApearance,
       });
     } catch (err) {
-      console.error("Error setting store appearance");
+      console.error("Error setting store appearance", err);
       return res.status(500).json({
         success: false,
         message: "Problem fetching store appearance settings",
@@ -770,7 +764,7 @@ router.patch(
         message: "store payment providers updated successfully",
       });
     } catch (err) {
-      console.error("Problem configuring store provider");
+      console.error("Problem configuring store provider", err);
       return res
         .status(500)
         .json({ message: "Problem configuring store provider" });
@@ -782,7 +776,7 @@ router.delete(
   "/store/settings/bankaccounts",
   authenticateAndVerifyCsrf,
   validateBankAccountDeleteInput,
-  async (req: Request, res: Response, next: NextFunction) => {
+  async (req: Request, res: Response) => {
     try {
       const user = req.user;
       if (!user)
@@ -820,7 +814,7 @@ router.delete(
         .status(200)
         .json({ success: true, message: "Delete action successful" });
     } catch (err) {
-      console.error("Problem deleting store bank accounts");
+      console.error("Problem deleting store bank accounts", err);
       return res
         .status(500)
         .json({ success: false, message: "Problem deleting bank account" });
@@ -832,7 +826,7 @@ router.delete(
   "/store/settings/providers",
   authenticateAndVerifyCsrf,
   validateBankAccountDeleteInput,
-  async (req: Request, res: Response, next: NextFunction) => {
+  async (req: Request, res: Response) => {
     try {
       const user = req.user;
       if (!user)
@@ -865,7 +859,7 @@ router.delete(
         message: "Provider configuration deletion was successful",
       });
     } catch (err) {
-      console.error("Problem deleting store bank accounts");
+      console.error("Problem deleting store bank accounts", err);
       return res
         .status(500)
         .json({ success: false, message: "Problem deleting bank account" });

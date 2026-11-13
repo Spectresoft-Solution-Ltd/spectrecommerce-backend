@@ -3,7 +3,6 @@ import { type Request, type Response, type NextFunction } from "express";
 import { cloudinary } from "../lib/cloudinanry.js";
 import type { UploadApiResponse } from "cloudinary";
 import { CloudinaryRequest } from "../utils/types/index.js";
-import multer from "multer";
 
 const validateSettingsInput = (
   req: Request,

@@ -33,13 +33,6 @@ const priceAmountSchema = z
     return minorAmount > 0n;
   }, "Price must be greater than zero");
 
-// Multipart sends "12.50" as a string; convert it, but keep "" invalid
-const numericString = (schema: z.ZodNumber) =>
-  z.preprocess(
-    (v) => (typeof v === "string" && v.trim() !== "" ? Number(v) : v),
-    schema,
-  );
-
 const validateProductCreateInput = async (
   req: Request,
   res: Response,

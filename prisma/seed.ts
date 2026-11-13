@@ -1035,7 +1035,7 @@ async function seedCartAndOrders(
     "Seeded cart, 9 orders, payments, webhook events and 6 refund requests",
   );
 
-  -console.log("Seeded cart, 5 orders, payments and webhook events");
+  console.log("Seeded cart, 5 orders, payments and webhook events");
   console.log(
     "Seeded cart, 5 orders, payments, webhook events and 3 refund requests",
   );

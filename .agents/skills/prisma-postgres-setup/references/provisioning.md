@@ -19,13 +19,13 @@ Store returned connection credentials immediately in the intended secret environ
 
 For server-to-server API access, use a workspace service token from the user's secret environment. If one is needed, direct the user to Workspace Settings → Service Tokens in Console and have them store it locally or in their secret manager. Use the bearer token without logging it. For an integration acting on behalf of users, use OAuth instead; see [operations](operations.md).
 
-| Failure                              | Response                                                                                 |
-| ------------------------------------ | ---------------------------------------------------------------------------------------- |
-| Authentication or permission denied  | Explain which authentication or access is missing.                                       |
-| Resource not found                   | Verify the resource ID and workspace; do not create a replacement automatically.         |
-| Invalid request                      | Check the current schema and selected region.                                            |
-| Rate limit or transient read failure | Retry with bounded backoff, honoring retry guidance.                                     |
-| Quota exhausted                      | Report the limit and available options.                                                  |
+| Failure                              | Response                                                                         |
+| ------------------------------------ | -------------------------------------------------------------------------------- |
+| Authentication or permission denied  | Explain which authentication or access is missing.                               |
+| Resource not found                   | Verify the resource ID and workspace; do not create a replacement automatically. |
+| Invalid request                      | Check the current schema and selected region.                                    |
+| Rate limit or transient read failure | Retry with bounded backoff, honoring retry guidance.                             |
+| Quota exhausted                      | Report the limit and available options.                                          |
 
 ## Temporary databases with create-db
 

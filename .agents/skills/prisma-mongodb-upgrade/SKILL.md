@@ -27,11 +27,11 @@ the migration mechanics.
 
 ## The version landscape
 
-| Version | MongoDB status |
-|---------|----------------|
-| Prisma ORM v6 | Fully supported (`mongodb` provider); latest 6.x is the current stable path; maintenance line |
-| Prisma ORM v7 | **No MongoDB connector — not an option, ever** |
-| Prisma 8 | MongoDB support in **Early Access** through `@prisma/orm-mongo`; still changes between release candidates — the successor path for MongoDB projects |
+| Version       | MongoDB status                                                                                                                                      |
+| ------------- | --------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Prisma ORM v6 | Fully supported (`mongodb` provider); latest 6.x is the current stable path; maintenance line                                                       |
+| Prisma ORM v7 | **No MongoDB connector — not an option, ever**                                                                                                      |
+| Prisma 8      | MongoDB support in **Early Access** through `@prisma/orm-mongo`; still changes between release candidates — the successor path for MongoDB projects |
 
 ## The decision, up front
 
@@ -47,13 +47,13 @@ Prisma 8 release candidates.
 
 ### Decision table
 
-| Signal | Direction |
-|--------|-----------|
-| No blockers below apply | Migrate to Prisma 8; run the `verify-cutover-checklist` and share feedback with the Prisma team |
-| Greenfield / prototype / internal tool | Migrate to Prisma 8 |
-| Codebase uses multi-document transactions (`$transaction`) — check with grep, do not ask | Plan raw-driver session equivalents first (see `client-api-mapping`), or stay on v6 until Prisma 8 adds a MongoDB transaction method |
-| Team cannot absorb breaking changes between release candidates | Stay on v6 until MongoDB support leaves Early Access |
-| Risk-averse but interested | Point Prisma 8 at the v6 schema with `prisma6Schema(...)` (see `schema-contract-mapping`), rehearse on a copy (see `verify-cutover-checklist`), then migrate |
+| Signal                                                                                   | Direction                                                                                                                                                    |
+| ---------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| No blockers below apply                                                                  | Migrate to Prisma 8; run the `verify-cutover-checklist` and share feedback with the Prisma team                                                              |
+| Greenfield / prototype / internal tool                                                   | Migrate to Prisma 8                                                                                                                                          |
+| Codebase uses multi-document transactions (`$transaction`) — check with grep, do not ask | Plan raw-driver session equivalents first (see `client-api-mapping`), or stay on v6 until Prisma 8 adds a MongoDB transaction method                         |
+| Team cannot absorb breaking changes between release candidates                           | Stay on v6 until MongoDB support leaves Early Access                                                                                                         |
+| Risk-averse but interested                                                               | Point Prisma 8 at the v6 schema with `prisma6Schema(...)` (see `schema-contract-mapping`), rehearse on a copy (see `verify-cutover-checklist`), then migrate |
 
 Note: this section will be updated when Prisma 8 adds a MongoDB transaction method.
 
@@ -67,13 +67,13 @@ Note: this section will be updated when Prisma 8 adds a MongoDB transaction meth
 
 ## Reference files
 
-| Reference | What it covers |
-|-----------|----------------|
-| `references/decision-stay-or-migrate.md` | The full decision framing, blocker checks, and stay-hygiene detail |
-| `references/schema-contract-mapping.md` | v6 schema (`mongodb` provider, `@db.ObjectId`, composite types) → Prisma 8 contract concepts |
-| `references/client-api-mapping.md` | v6 client calls → Prisma 8 equivalents, incl. raw escape hatches and transactions — names map, parity does not |
-| `references/migrations-mapping.md` | v6 `db push`-only story → Prisma 8's plan/migrate/verify/sign flow |
-| `references/verify-cutover-checklist.md` | No-data-moves verification: same DB, index parity, staged round-trip before cutover |
+| Reference                                | What it covers                                                                                                 |
+| ---------------------------------------- | -------------------------------------------------------------------------------------------------------------- |
+| `references/decision-stay-or-migrate.md` | The full decision framing, blocker checks, and stay-hygiene detail                                             |
+| `references/schema-contract-mapping.md`  | v6 schema (`mongodb` provider, `@db.ObjectId`, composite types) → Prisma 8 contract concepts                   |
+| `references/client-api-mapping.md`       | v6 client calls → Prisma 8 equivalents, incl. raw escape hatches and transactions — names map, parity does not |
+| `references/migrations-mapping.md`       | v6 `db push`-only story → Prisma 8's plan/migrate/verify/sign flow                                             |
+| `references/verify-cutover-checklist.md` | No-data-moves verification: same DB, index parity, staged round-trip before cutover                            |
 
 ## Verified against
 

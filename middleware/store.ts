@@ -415,7 +415,7 @@ const validateCurrencyInputs = async (
     req.body = result.data;
     next();
   } catch (err) {
-    console.error("Problem validating bank currency");
+    console.error("Problem validating bank currency", err);
     return res
       .status(500)
       .json({ success: false, message: "Failed to validate currency inputs" });
@@ -500,7 +500,7 @@ const validateBankAccountDeleteInput = async (
     req.body = result.data;
     next();
   } catch (err) {
-    console.error("Problem validating bank account delete inputs");
+    console.error("Problem validating bank account delete inputs", err);
     return res.status(500).json({
       success: false,
       message: "Problem validating bank account delete inputs",
@@ -541,7 +541,7 @@ const validateProviderConfigInput = async (
     req.body = result.data;
     next();
   } catch (err) {
-    console.error("Problem validating provider configuration inputs");
+    console.error("Problem validating provider configuration inputs", err);
     return res.status(500).json({
       success: false,
       message: "Problem validating provider configuration inputs",
