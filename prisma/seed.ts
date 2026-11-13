@@ -10,6 +10,8 @@ type OrderStatusCode =
   | "DELIVERED"
   | "CANCELLED";
 
+type RefundStatusCode = "PENDING" | "APPROVED" | "REJECTED" | "COMPLETED";
+
 interface SeedProduct {
   name: string;
   slug: string;
@@ -33,7 +35,7 @@ interface SeedStore {
   domain: string | null;
   appearance: {
     logo_url?: string;
-    cover_image?: string;
+    cover_images?: string[];
     bg_mode?: "light" | "dark";
     background_color?: string;
   };
@@ -173,7 +175,7 @@ const stores: SeedStore[] = [
     domain: "gadgets.example.com",
     appearance: {
       logo_url: "https://placehold.co/200x200?text=SG",
-      cover_image: "https://placehold.co/1200x400?text=Spectre+Gadgets",
+      cover_images: ["https://placehold.co/1200x400?text=Spectre+Gadgets"],
       bg_mode: "dark",
       background_color: "#0f172a",
     },
@@ -234,7 +236,7 @@ const stores: SeedStore[] = [
     domain: null,
     appearance: {
       logo_url: "https://placehold.co/200x200?text=AF",
-      cover_image: "https://placehold.co/1200x400?text=Ade+Fashion",
+      cover_images: ["https://placehold.co/1200x400?text=Ade+Fashion"],
       bg_mode: "light",
       background_color: "#fff7ed",
     },
@@ -273,7 +275,7 @@ const stores: SeedStore[] = [
     domain: "books.example.com",
     appearance: {
       logo_url: "https://placehold.co/200x200?text=LB",
-      cover_image: "https://placehold.co/1200x400?text=Lagos+Books",
+      cover_images: ["https://placehold.co/1200x400?text=Lagos+Books"],
       bg_mode: "light",
       background_color: "#f0fdf4",
     },
@@ -540,6 +542,58 @@ async function createOrder(args: {
   return order;
 }
 
+async function createRefund(args: {
+  storeId: number;
+  orderId: number;
+  paymentId?: number;
+  requestedByUserId: number;
+  reviewedByUserId?: number;
+  reason: string;
+  customerNote?: string;
+  merchantNote?: string;
+  amount: bigint;
+  status: RefundStatusCode;
+  reviewedAt?: Date;
+  completedAt?: Date;
+  items: {
+    orderItemId: number;
+    quantity: number;
+    amount: bigint;
+    restockQuantity: number;
+  }[];
+}) {
+  const existing = await prisma.refundRequest.findFirst({
+    where: { order_id: args.orderId, reason: args.reason },
+  });
+  if (existing) return existing;
+
+  return prisma.refundRequest.create({
+    data: {
+      store_id: args.storeId,
+      order_id: args.orderId,
+      payment_id: args.paymentId,
+      requested_by_user_id: args.requestedByUserId,
+      reviewed_by_user_id: args.reviewedByUserId,
+      reason: args.reason,
+      customer_note: args.customerNote,
+      merchant_note: args.merchantNote,
+      amount: args.amount,
+      currency: "NAIRA",
+      status: args.status,
+      reviewed_at: args.reviewedAt,
+      completed_at: args.completedAt,
+      items: {
+        create: args.items.map((i) => ({
+          order_item_id: i.orderItemId,
+          quantity: i.quantity,
+          amount: i.amount,
+          restock_quantity: i.restockQuantity,
+        })),
+      },
+    },
+  });
+}
+
 async function seedCartAndOrders(
   userMap: Record<string, { id: number; email: string }>,
   catalog: Awaited<ReturnType<typeof seedStores>>,
@@ -761,6 +815,84 @@ async function seedCartAndOrders(
   });
 
   console.log("Seeded cart, 5 orders, payments and webhook events");
+
+  const itemFor = (orderId: number, productId: number) =>
+    prisma.orderItems.findFirstOrThrow({
+      where: { order_id: orderId, product_id: productId },
+    });
+
+  // Refund 1: PENDING. Customer wants one charger back from the delivered
+  // order; no payment selected yet (merchant picks it during review).
+  await createRefund({
+    storeId,
+    orderId: order1.id,
+    requestedByUserId: customer.id,
+    reason: "Charger stopped working after a week",
+    customerNote: "It no longer charges my phone.",
+    amount: charger.price,
+    status: "PENDING",
+    items: [
+      {
+        orderItemId: (await itemFor(order1.id, charger.id)).id,
+        quantity: 1,
+        amount: charger.price,
+        restockQuantity: 0,
+      },
+    ],
+  });
+
+  // Refund 2: COMPLETED. Cancelled order, payment already REFUNDED,
+  // unit returned to stock.
+  const payment4 = await prisma.payment.findUniqueOrThrow({
+    where: { reference: "PAY-SEED-0004" },
+  });
+  await createRefund({
+    storeId,
+    orderId: order4.id,
+    paymentId: payment4.id,
+    requestedByUserId: customer.id,
+    reviewedByUserId: merchant.id,
+    reason: "Cancelled order, full refund",
+    merchantNote: "Refunded to original payment method.",
+    amount: order4.total,
+    status: "COMPLETED",
+    reviewedAt: new Date(),
+    completedAt: new Date(),
+    items: [
+      {
+        orderItemId: (await itemFor(order4.id, charger.id)).id,
+        quantity: 1,
+        amount: charger.price,
+        restockQuantity: 1,
+      },
+    ],
+  });
+
+  // Refund 3: REJECTED. Requested while the order was still processing.
+  await createRefund({
+    storeId,
+    orderId: order5.id,
+    requestedByUserId: customer.id,
+    reviewedByUserId: merchant.id,
+    reason: "Changed my mind",
+    merchantNote: "Order is already being processed for shipping.",
+    amount: charger.price,
+    status: "REJECTED",
+    reviewedAt: new Date(),
+    items: [
+      {
+        orderItemId: (await itemFor(order5.id, charger.id)).id,
+        quantity: 1,
+        amount: charger.price,
+        restockQuantity: 0,
+      },
+    ],
+  });
+
+  -console.log("Seeded cart, 5 orders, payments and webhook events");
+  console.log(
+    "Seeded cart, 5 orders, payments, webhook events and 3 refund requests",
+  );
 }
 
 async function seed() {

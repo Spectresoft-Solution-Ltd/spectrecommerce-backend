@@ -13,24 +13,27 @@ datasource db {
 }
 
 model User {
-  id                 Int               @id @default(autoincrement())
-  first_name         String
-  last_name          String
-  username           String            @unique
-  email              String            @unique
-  password_hash      String?
-  address            String?
-  role               Role              @default(USER)
-  created_at         DateTime          @default(now())
-  updated_at         DateTime          @updatedAt
-  paymentsVerified   Payment[]         @relation("PaymentVerifier")
-  carts              Cart[]
-  orderItems         OrderItems[]
-  orders             Orders[]
-  preferred_currency Currency          @default(NAIRA)
-  storeMemberships   StoreMembership[]
-  profiles           Profile[]
-  payments           Payment[]
+  id                      Int               @id @default(autoincrement())
+  first_name              String
+  last_name               String
+  username                String            @unique
+  email                   String            @unique
+  password_hash           String?
+  address                 String?
+  role                    Role              @default(USER)
+  created_at              DateTime          @default(now())
+  updated_at              DateTime          @updatedAt
+  paymentsVerified        Payment[]         @relation("PaymentVerifier")
+  carts                   Cart[]
+  orderItems              OrderItems[]
+  orders                  Orders[]
+  preferred_currency      Currency          @default(NAIRA)
+  storeMemberships        StoreMembership[]
+  profiles                Profile[]
+  payments                Payment[]
+  refundRequests          RefundRequest[]
+  refundRequestsSubmitted RefundRequest[]   @relation("RefundRequester")
+  refundRequestsReviewed  RefundRequest[]   @relation("RefundReviewer")
 }
 
 model Profile {
@@ -129,13 +132,13 @@ model ProductPrice {
 }
 
 model Orders {
-  id               Int          @id @default(autoincrement())
+  id               Int             @id @default(autoincrement())
   user_id          Int?
-  user             User?        @relation(fields: [user_id], references: [id])
+  user             User?           @relation(fields: [user_id], references: [id])
   store_id         Int
-  store            Store        @relation(fields: [store_id], references: [id])
+  store            Store           @relation(fields: [store_id], references: [id])
   order_number     String
-  status           OrderStatus  @default(PENDING)
+  status           OrderStatus     @default(PENDING)
   sub_total        BigInt // kobo or cent
   total            BigInt // kobo or cent
   shipping_fee     BigInt
@@ -146,8 +149,9 @@ model Orders {
   currency         Currency
   orderItems       OrderItems[]
   payments         Payment[]
-  created_at       DateTime     @default(now())
-  updated_at       DateTime     @updatedAt
+  created_at       DateTime        @default(now())
+  updated_at       DateTime        @updatedAt
+  refundRequests   RefundRequest[]
 
   @@unique([store_id, order_number])
   @@index([store_id, status, created_at])
@@ -155,18 +159,19 @@ model Orders {
 }
 
 model OrderItems {
-  id                  Int      @id @default(autoincrement())
+  id                  Int                 @id @default(autoincrement())
   order_id            Int
-  order               Orders   @relation(fields: [order_id], references: [id])
+  order               Orders              @relation(fields: [order_id], references: [id])
   product_id          Int?
-  product             Product? @relation(fields: [product_id], references: [id], onDelete: SetNull)
+  product             Product?            @relation(fields: [product_id], references: [id], onDelete: SetNull)
   product_name        String
   product_image       String
   product_description String
   unit_price          BigInt // kobo or cent
   quantity            Int
-  user                User?    @relation(fields: [userId], references: [id])
+  user                User?               @relation(fields: [userId], references: [id])
   userId              Int?
+  refundRequestItems  RefundRequestItem[]
 }
 
 model Payment {
@@ -194,6 +199,7 @@ model Payment {
   updated_at          DateTime              @updatedAt
   user                User?                 @relation(fields: [userId], references: [id])
   userId              Int?
+  refundRequests      RefundRequest[]
 
   @@index([order_id, status])
   @@index([provider_config_id, provider_reference])
@@ -246,6 +252,7 @@ model Store {
   carts                 Cart[]
   cartItems             CartItem[]
   storeAppearance       StoreAppearance?
+  refundRequests        RefundRequest[]
 }
 
 model StoreAppearance {
@@ -328,6 +335,79 @@ model Plan {
   max_products  BigInt
   created_at    DateTime @default(now())
   stores        Store[]
+}
+
+model RefundRequest {
+  id       Int   @id @default(autoincrement())
+  store_id Int
+  store    Store @relation(fields: [store_id], references: [id])
+
+  order_id Int
+  order    Orders @relation(fields: [order_id], references: [id])
+
+  // The payment selected for refund. Optional because
+  // the merchant may need to select it during review.
+  payment_id Int?
+  payment    Payment? @relation(fields: [payment_id], references: [id])
+
+  requested_by_user_id Int
+  requested_by         User @relation("RefundRequester", fields: [requested_by_user_id], references: [id])
+
+  reviewed_by_user_id Int?
+  reviewed_by         User? @relation("RefundReviewer", fields: [reviewed_by_user_id], references: [id])
+
+  reason        String
+  customer_note String?
+  merchant_note String?
+
+  amount   BigInt
+  currency Currency
+
+  status RefundStatus @default(PENDING)
+
+  reviewed_at  DateTime?
+  completed_at DateTime?
+
+  items RefundRequestItem[]
+
+  created_at DateTime @default(now())
+  updated_at DateTime @updatedAt
+  user       User?    @relation(fields: [userId], references: [id])
+  userId     Int?
+
+  @@index([store_id, status, created_at])
+  @@index([order_id])
+  @@index([requested_by_user_id])
+  @@index([payment_id])
+}
+
+model RefundRequestItem {
+  id Int @id @default(autoincrement())
+
+  refund_request_id Int
+  refund_request    RefundRequest @relation(fields: [refund_request_id], references: [id])
+
+  order_item_id Int
+  order_item    OrderItems @relation(fields: [order_item_id], references: [id])
+
+  quantity Int
+  amount   BigInt
+
+  // How many returned units the merchant wants
+  // added back to inventory after the return.
+  restock_quantity Int @default(0)
+
+  created_at DateTime @default(now())
+
+  @@unique([refund_request_id, order_item_id])
+  @@index([order_item_id])
+}
+
+enum RefundStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  COMPLETED
 }
 
 enum PaymentMethods {
