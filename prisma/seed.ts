@@ -1,4 +1,4 @@
-import { randomBytes, scryptSync } from "node:crypto";
+import argon2 from "argon2";
 import { prisma } from "../lib/prisma.js";
 
 type CurrencyCode = "NAIRA" | "DOLLAR";
@@ -92,11 +92,9 @@ const plans = [
 
 const SEED_PASSWORD = process.env.SEED_PASSWORD ?? "ChangeMe123!";
 
-// Swap this for bcrypt/argon2 if that's what your auth code verifies against.
-function hashPassword(password: string) {
-  const salt = randomBytes(16).toString("hex");
-  const hash = scryptSync(password, salt, 64).toString("hex");
-  return `scrypt$${salt}$${hash}`;
+// Hash with argon2 to match authentication verification
+async function hashPassword(password: string) {
+  return argon2.hash(password);
 }
 
 const users = [
@@ -136,6 +134,7 @@ const users = [
 
 async function seedUsers() {
   const byUsername: Record<string, { id: number; email: string }> = {};
+  const hashedPassword = await hashPassword(SEED_PASSWORD);
 
   for (const u of users) {
     const user = await prisma.user.upsert({
@@ -145,8 +144,9 @@ async function seedUsers() {
         last_name: u.last_name,
         role: u.role,
         address: u.address,
+        password_hash: hashedPassword,
       },
-      create: { ...u, password_hash: hashPassword(SEED_PASSWORD) },
+      create: { ...u, password_hash: hashedPassword },
     });
 
     await prisma.profile.upsert({

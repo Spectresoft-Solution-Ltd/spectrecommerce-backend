@@ -66,14 +66,14 @@ router.post(
         },
       });
 
-      if (!user) {
+      if (!user || !user.password_hash || !user.password_hash.startsWith("$")) {
         return res.status(401).json({
           message: "Invalid credentials",
         });
       }
 
       const isPasswordValid = await PasswordHasher.verify(
-        user.password_hash || "",
+        user.password_hash,
         password,
       );
 
