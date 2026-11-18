@@ -1,4 +1,5 @@
 import * as z from "zod";
+import type { JwtPayload } from "jsonwebtoken";
 import { prisma } from "../../lib/prisma.js";
 import { redis } from "../../lib/redis.js";
 import { convertFromMinorUnit } from "../types/index.js";
@@ -38,7 +39,7 @@ export type ProductQueryInput = z.infer<typeof productQuerySchema>;
  * to view store management data (e.g. inactive or archived products).
  */
 export async function verifyStoreMemberAccess(
-  user: any,
+  user: JwtPayload | undefined,
   storeId: number,
   requiredPermission: StorePermission = "VIEW_STORE",
 ): Promise<{ authorized: boolean; statusCode?: number; message?: string }> {
@@ -84,10 +85,12 @@ export async function verifyStoreMemberAccess(
  * Converts BigInt price amounts to human-readable decimal strings
  * so the product can be safely serialized to JSON.
  */
-export function serializeProduct(product: any) {
+export function serializeProduct<
+  T extends { prices: Array<{ amount: bigint }> },
+>(product: T) {
   return {
     ...product,
-    prices: product.prices.map((p: any) => ({
+    prices: product.prices.map((p) => ({
       ...p,
       amount: convertFromMinorUnit(p.amount),
     })),

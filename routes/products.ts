@@ -12,10 +12,7 @@ import { upload } from "../lib/multer.js";
 import { prisma } from "../lib/prisma.js";
 import { redis } from "../lib/redis.js";
 import { Product_prices } from "../utils/types/products.js";
-import {
-  convertToMinorUnit,
-  convertFromMinorUnit,
-} from "../utils/types/index.js";
+import { convertToMinorUnit } from "../utils/types/index.js";
 import {
   PRODUCTS_CACHE_TTL,
   buildOrderBy,
@@ -27,6 +24,19 @@ import {
   serializeProduct,
   verifyStoreMemberAccess,
 } from "../utils/functions/products.js";
+import type {
+  ProductWhereInput,
+  ProductUncheckedUpdateInput,
+  ProductGetPayload,
+} from "../generated/prisma/models/Product.js";
+
+type ProductWithRelations = ProductGetPayload<{
+  include: {
+    category: true;
+    productImages: true;
+    prices: true;
+  };
+}>;
 
 const router = Router();
 
@@ -218,13 +228,13 @@ router.get("/products", async (req: Request, res: Response) => {
       });
     }
 
-    const where: any = {
+    const where: ProductWhereInput = {
       is_active: true,
       ...(category_id && { category_id }),
       ...(search && { name: { contains: search, mode: "insensitive" } }),
     };
 
-    let products: any[];
+    let products: ProductWithRelations[];
     const total = await prisma.product.count({ where });
 
     if (isPriceSort) {
@@ -243,7 +253,9 @@ router.get("/products", async (req: Request, res: Response) => {
         include: { category: true, productImages: true, prices: true },
       });
       const map = new Map(fetched.map((p) => [p.id, p]));
-      products = orderedIds.map((id) => map.get(id)).filter(Boolean);
+      products = orderedIds
+        .map((id) => map.get(id))
+        .filter((p): p is ProductWithRelations => p !== undefined);
     } else {
       products = await prisma.product.findMany({
         where,
@@ -356,7 +368,7 @@ router.get(
         });
       }
 
-      const where: any = {
+      const where: ProductWhereInput = {
         store_id,
         ...(status === "active" && { is_active: true }),
         ...(status === "inactive" && { is_active: false }),
@@ -365,7 +377,7 @@ router.get(
         ...(search && { name: { contains: search, mode: "insensitive" } }),
       };
 
-      let products: any[];
+      let products: ProductWithRelations[];
       const total = await prisma.product.count({ where });
 
       if (isPriceSort) {
@@ -384,7 +396,9 @@ router.get(
           include: { category: true, productImages: true, prices: true },
         });
         const map = new Map(fetched.map((p) => [p.id, p]));
-        products = orderedIds.map((id) => map.get(id)).filter(Boolean);
+        products = orderedIds
+          .map((id) => map.get(id))
+          .filter((p): p is ProductWithRelations => p !== undefined);
       } else {
         products = await prisma.product.findMany({
           where,
@@ -562,7 +576,7 @@ router.patch(
         }
 
         // 4. Update product fields
-        const updateData: any = {};
+        const updateData: ProductUncheckedUpdateInput = {};
         if (req.body.name !== undefined) updateData.name = req.body.name;
         if (req.body.slug !== undefined) updateData.slug = req.body.slug;
         if (req.body.description !== undefined)
