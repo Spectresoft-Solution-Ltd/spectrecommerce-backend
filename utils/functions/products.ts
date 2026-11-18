@@ -2,10 +2,7 @@ import * as z from "zod";
 import { prisma } from "../../lib/prisma.js";
 import { redis } from "../../lib/redis.js";
 import { convertFromMinorUnit } from "../types/index.js";
-import {
-  ROLE_PERMISSIONS,
-  type StorePermission,
-} from "../types/permission.js";
+import { ROLE_PERMISSIONS, type StorePermission } from "../types/permission.js";
 
 // ─── Schemas ────────────────────────────────────────────────────────────────
 
@@ -18,7 +15,14 @@ export const productFiltersSchema = z.object({
   search: z.string().trim().min(1).optional(),
   category_id: z.coerce.number().int().positive().optional(),
   sort: z
-    .enum(["newest", "oldest", "name_asc", "name_desc", "price_asc", "price_desc"])
+    .enum([
+      "newest",
+      "oldest",
+      "name_asc",
+      "name_desc",
+      "price_asc",
+      "price_desc",
+    ])
     .default("newest"),
   status: z.enum(["active", "inactive", "all"]).default("active"),
 });
@@ -96,11 +100,15 @@ export function serializeProduct(product: any) {
  */
 export function buildOrderBy(sort: string): Record<string, string> {
   switch (sort) {
-    case "oldest":    return { created_at: "asc" };
-    case "name_asc":  return { name: "asc" };
-    case "name_desc": return { name: "desc" };
+    case "oldest":
+      return { created_at: "asc" };
+    case "name_asc":
+      return { name: "asc" };
+    case "name_desc":
+      return { name: "desc" };
     case "newest":
-    default:          return { created_at: "desc" };
+    default:
+      return { created_at: "desc" };
   }
 }
 

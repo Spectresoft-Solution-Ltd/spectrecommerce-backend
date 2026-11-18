@@ -212,23 +212,20 @@ const validateProductUpdateInput = async (
           .optional(),
       ),
 
-      delete_image_ids: z.preprocess(
-        (value) => {
-          if (typeof value === "string") {
-            try {
-              const parsed = JSON.parse(value);
-              return Array.isArray(parsed) ? parsed : [Number(parsed)];
-            } catch {
-              return value
-                .split(",")
-                .map((v) => Number(v.trim()))
-                .filter(Boolean);
-            }
+      delete_image_ids: z.preprocess((value) => {
+        if (typeof value === "string") {
+          try {
+            const parsed = JSON.parse(value);
+            return Array.isArray(parsed) ? parsed : [Number(parsed)];
+          } catch {
+            return value
+              .split(",")
+              .map((v) => Number(v.trim()))
+              .filter(Boolean);
           }
-          return value;
-        },
-        z.array(z.number().int().positive()).optional(),
-      ),
+        }
+        return value;
+      }, z.array(z.number().int().positive()).optional()),
     });
 
     const result = inputSchema.safeParse(req.body);
@@ -256,7 +253,8 @@ const validateProductUpdateInput = async (
     if (!storeIdParam.success || !productIdParam.success) {
       return res.status(400).json({
         success: false,
-        message: "Invalid or missing store ID (query ?id=...) or product ID (param)",
+        message:
+          "Invalid or missing store ID (query ?id=...) or product ID (param)",
       });
     }
 
