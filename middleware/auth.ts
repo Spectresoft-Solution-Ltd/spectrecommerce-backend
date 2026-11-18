@@ -44,6 +44,30 @@ export async function authenticateAndVerifyCsrf(
   }
 }
 
+export async function optionalAuth(
+  req: Request,
+  _res: Response,
+  next: NextFunction,
+) {
+  const token = req.cookies?.access_token;
+  if (!token || !jwtSecret) return next();
+
+  try {
+    const decoded = Jwt.verify(token, jwtSecret);
+    if (typeof decoded === "string") return next();
+
+    const validAfter =
+      Number(await redis.get(`auth:valid_after:${decoded.sub}`)) || 0;
+    if (decoded.iat && decoded.iat >= validAfter) {
+      req.user = decoded as JwtPayload;
+    }
+  } catch {
+    // If token is invalid or expired, continue as unauthenticated guest
+  }
+
+  next();
+}
+
 export function validateRegisterInput(
   req: Request,
   res: Response,

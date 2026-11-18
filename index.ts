@@ -19,6 +19,15 @@ app.use(express.urlencoded({ extended: true }));
 
 app.use(api);
 
+app.get("/", async (_req: Request, res: Response) => {
+  try {
+    console.log("Action successful at get route");
+    res.send("Hell get");
+  } catch (err) {
+    console.error(`Failed to fetch details from route: ${err}`);
+  }
+});
+
 const port = Number(process.env.PORT ?? 3000);
 
 app.use((err: unknown, _req: Request, res: Response, next: NextFunction) => {

@@ -4,6 +4,7 @@ import { CloudinaryRequest } from "../utils/types/index.js";
 import { UploadApiResponse } from "cloudinary";
 import sharp from "sharp";
 import { cloudinary } from "../lib/cloudinanry.js";
+import { prisma } from "../lib/prisma.js";
 import { uploadToCloudinary } from "../utils/functions/index.js";
 import type { Currency } from "../generated/prisma/enums.js";
 
@@ -146,6 +147,141 @@ const validateProductCreateInput = async (
   }
 };
 
+const validateProductUpdateInput = async (
+  req: Request,
+  res: Response,
+  next: NextFunction,
+) => {
+  try {
+    const inputSchema = z.object({
+      name: z.string().trim().min(1, "Product name cannot be empty").optional(),
+
+      slug: z.string().trim().min(1, "Product slug cannot be empty").optional(),
+
+      description: z
+        .string()
+        .trim()
+        .min(1, "Product description cannot be empty")
+        .optional(),
+
+      sku: z.preprocess(
+        (value) => (value === "" ? null : value),
+        z.string().trim().nullable().optional(),
+      ),
+
+      is_active: z.preprocess((value) => {
+        if (value === "true") return true;
+        if (value === "false") return false;
+        return value;
+      }, z.boolean().optional()),
+
+      stock_quantity: z.preprocess(
+        (value) =>
+          typeof value === "string" && value.trim() !== ""
+            ? Number(value)
+            : value,
+        z.number().int().min(0).optional(),
+      ),
+
+      category_id: z.preprocess(
+        (value) =>
+          typeof value === "string" && value.trim() !== ""
+            ? Number(value)
+            : value,
+        z.number().int().positive().optional(),
+      ),
+
+      prices: z.preprocess(
+        parsePrices,
+        z
+          .array(
+            z.object({
+              currency: z
+                .enum(["NAIRA", "DOLLAR"])
+                .transform((value) => value as Currency),
+
+              amount: priceAmountSchema,
+            }),
+          )
+          .min(1, "At least one price is required if updating prices")
+          .refine(
+            (items) =>
+              new Set(items.map((item) => item.currency)).size === items.length,
+            "Duplicate currencies are not allowed",
+          )
+          .optional(),
+      ),
+
+      delete_image_ids: z.preprocess((value) => {
+        if (typeof value === "string") {
+          try {
+            const parsed = JSON.parse(value);
+            return Array.isArray(parsed) ? parsed : [Number(parsed)];
+          } catch {
+            return value
+              .split(",")
+              .map((v) => Number(v.trim()))
+              .filter(Boolean);
+          }
+        }
+        return value;
+      }, z.array(z.number().int().positive()).optional()),
+    });
+
+    const result = inputSchema.safeParse(req.body);
+
+    const storeIdParam = z.coerce
+      .number()
+      .int()
+      .positive()
+      .safeParse(req.query.id);
+
+    const productIdParam = z.coerce
+      .number()
+      .int()
+      .positive()
+      .safeParse(req.params.product_id);
+
+    if (!result.success) {
+      return res.status(400).json({
+        success: false,
+        message: "Invalid request body",
+        errors: z.treeifyError(result.error),
+      });
+    }
+
+    if (!storeIdParam.success || !productIdParam.success) {
+      return res.status(400).json({
+        success: false,
+        message:
+          "Invalid or missing store ID (query ?id=...) or product ID (param)",
+      });
+    }
+
+    const files = Array.isArray(req.files)
+      ? req.files
+      : (req.files?.product_images ?? []);
+
+    if (files.length > 5) {
+      return res.status(400).json({
+        success: false,
+        message: "Maximum of 5 product images allowed",
+      });
+    }
+
+    req.body = result.data;
+
+    next();
+  } catch (err) {
+    console.error("Problem validating product update input:", err);
+
+    return res.status(500).json({
+      success: false,
+      message: "Problem validating product update inputs",
+    });
+  }
+};
+
 const uploadProductImagesToCloudinary = async (
   req: CloudinaryRequest,
   res: Response,
@@ -162,7 +298,7 @@ const uploadProductImagesToCloudinary = async (
     }
 
     const storeId = Number(req.query.id);
-    const categoryId = Number(req.query.category_id);
+    let categoryId = Number(req.query.category_id || req.body?.category_id);
 
     const files = Array.isArray(req.files)
       ? req.files
@@ -170,10 +306,21 @@ const uploadProductImagesToCloudinary = async (
 
     if (!files.length) return next();
 
+    // If updating a product and category_id isn't in query/body, find it from the product
+    if (!categoryId && req.params.product_id) {
+      const existingProduct = await prisma.product.findUnique({
+        where: { id: Number(req.params.product_id) },
+        select: { category_id: true },
+      });
+      if (existingProduct) {
+        categoryId = existingProduct.category_id;
+      }
+    }
+
     if (!storeId || !categoryId) {
       return res.status(400).json({
         success: false,
-        message: "Store ID and product ID are required",
+        message: "Store ID and category ID are required",
       });
     }
 
@@ -276,6 +423,7 @@ const cleanupProductImages = async (req: Request) => {
 
 export {
   validateProductCreateInput,
+  validateProductUpdateInput,
   uploadProductImagesToCloudinary,
   cleanupProductImages,
 };
